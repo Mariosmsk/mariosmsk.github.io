@@ -52,7 +52,7 @@
         }
         var map = L.map('map', {
             zoomControl:true, maxZoom:28, minZoom:1
-        }).fitBounds([[34.52412375679577,31.98385117136625],[35.73577445731681,34.86751796749041]]);
+        }).fitBounds([[34.55710439391,32.17859636245801],[35.65968709757314,34.80197594093266]]);
         var hash = new L.Hash(map);
         map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
         var measureControl = new L.Control.Measure({
@@ -94,11 +94,15 @@
             });
             var popupContent = '<table>\
                     <tr>\
-                        <th scope="row">Area</th>\
+                        <th scope="row">Area:</th>\
                         <td>' + (feature.properties['vil_nm_g'] !== null ? Autolinker.link(String(feature.properties['vil_nm_g'])) : '') + '</td>\
                     </tr>\
                     <tr>\
-                        <th scope="row">Population</th>\
+                        <th scope="row">Post code:</th>\
+                        <td>' + (feature.properties['post_code'] !== null ? Autolinker.link(String(feature.properties['post_code'])) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Population:</th>\
                         <td>' + (feature.properties['population'] !== null ? Autolinker.link(String(feature.properties['population'])) : '') + '</td>\
                     </tr>\
                 </table>';
