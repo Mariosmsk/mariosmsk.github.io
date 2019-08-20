@@ -13,7 +13,7 @@
 }
 
 #story_header {
-    font-size: 28pt;
+    font-size: 26pt;
     font-weight: bold;
     text-align: left;
     color: #fff;
@@ -22,7 +22,7 @@
 }
 
 #story_body {
-    font-size: 14pt;
+    font-size: 12pt;
     height: 9em;
     color: #fff;
     padding: 0 0.5em;
