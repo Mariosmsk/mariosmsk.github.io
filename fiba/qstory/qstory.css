@@ -1,0 +1,39 @@
+#map {
+    z-index: -1;
+}
+
+#story {
+    position: absolute;
+    z-index: 10;
+    bottom: 2em;
+    width: 100%;
+    height: 20em;
+    background: #0009;
+    font-family: sans-serif;
+}
+
+#story_header {
+    font-size: 28pt;
+    font-weight: bold;
+    text-align: left;
+    color: #fff;
+    padding: 0 0.25em;
+    letter-spacing: 0.08em;
+}
+
+#story_body {
+    font-size: 14pt;
+    height: 9em;
+    color: #fff;
+    padding: 0 0.5em;
+}
+
+#story_footer {
+    position: absolute;
+    right: 2em;
+    bottom: 1em;
+}
+
+#story_footer {
+    margin: 2px;
+}
