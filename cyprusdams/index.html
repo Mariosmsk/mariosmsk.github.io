@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cyprus Dam Storage Dashboard</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 1rem;
+      background-color: #f0f7ff;
+      color: #333;
+    }
+
+    #dataDate {
+      text-align: center;
+      font-size: 1.5rem;
+      color: #0074d9;
+      font-weight: bold;
+      margin-bottom: 1rem;
+    }
+
+    #totalContainer {
+      max-width: 700px;
+      margin: 0 auto 1.5rem;
+      text-align: center;
+    }
+
+    #totalLabel {
+      font-size: 1.1rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      color: #333;
+    }
+
+    #totalBar {
+      width: 100%;
+      background-color: #d0e7ff;
+      border-radius: 10px;
+      height: 20px;
+      overflow: hidden;
+    }
+
+    #totalFill {
+      height: 100%;
+      background-color: #0074d9;
+      width: 0%;
+      transition: width 0.5s ease;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .tank {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .tank-name {
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: #0074d9;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+
+    .tank-visual {
+      height: 120px;
+      width: 50px;
+      background-color: #d0e7ff;
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column-reverse;
+      margin-bottom: 0.5rem;
+    }
+
+    .tank-fill {
+      background-color: #0074d9;
+      width: 100%;
+      transition: height 0.5s ease;
+    }
+
+    .tank-percent {
+      font-size: 0.95rem;
+      color: #444;
+      font-weight: bold;
+    }
+
+    @media (max-width: 600px) {
+      #dataDate {
+        font-size: 1.2rem;
+      }
+
+      #totalLabel {
+        font-size: 1rem;
+      }
+
+      .tank-visual {
+        height: 100px;
+        width: 40px;
+      }
+
+      .tank-name {
+        font-size: 0.8rem;
+      }
+
+      .tank-percent {
+        font-size: 0.85rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="dataDate">Πληρότητα Φραγμάτων</div>
+  <div id="totalContainer">
+    <div id="totalLabel">Συνολική Πληρότητα: --%</div>
+    <div id="totalBar">
+      <div id="totalFill"></div>
+    </div>
+  </div>
+  <div class="dashboard" id="damDashboard"></div>
+
+  <script>
+    async function fetchLatestCSVUrl() {
+      const baseUrl = 'https://raw.githubusercontent.com/opendatacy/cyprusdams/main/daily/';
+      const today = new Date();
+
+      for (let i = 0; i < 10; i++) {
+        const dateStr = today.toISOString().split('T')[0];
+        const testUrl = `${baseUrl}${dateStr}.csv`;
+        try {
+          const res = await fetch(testUrl);
+          if (res.ok) return { url: testUrl, date: dateStr };
+        } catch {}
+        today.setDate(today.getDate() - 1);
+      }
+
+      throw new Error('No recent CSV data found.');
+    }
+
+    async function fetchCSVData(url) {
+      const response = await fetch(url);
+      const text = await response.text();
+      const rows = text.trim().split('\n');
+      const headers = rows[0].split(',');
+      const dataRows = rows.slice(1);
+
+      const idxName = headers.indexOf('Reservoir');
+      const idxCapacity = headers.indexOf('Capacity_(MCM)');
+      const idxPercent = headers.indexOf('CurrentStorage(%)');
+
+      return dataRows.map(line => {
+        const cols = line.split(',');
+        let name = cols[idxName].trim().replace('Κλήρου-Μαλούντα', 'ΚλήρουΜαλούντα');
+        return {
+          name: name,
+          percent: parseFloat(cols[idxPercent]),
+          capacity: parseFloat(cols[idxCapacity])
+        };
+      }).filter(d => !isNaN(d.percent) && !isNaN(d.capacity));
+    }
+
+    function createTank({ name, percent }) {
+      const tank = document.createElement('div');
+      tank.className = 'tank';
+
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'tank-name';
+      nameDiv.textContent = name;
+
+      const visual = document.createElement('div');
+      visual.className = 'tank-visual';
+
+      const fill = document.createElement('div');
+      fill.className = 'tank-fill';
+      fill.style.height = `${Math.min(percent, 100)}%`;
+
+      const label = document.createElement('div');
+      label.className = 'tank-percent';
+      label.textContent = percent.toFixed(2) + '%';
+
+      visual.appendChild(fill);
+      tank.appendChild(nameDiv);
+      tank.appendChild(visual);
+      tank.appendChild(label);
+
+      return tank;
+    }
+
+    async function renderDashboard() {
+      try {
+        const result = await fetchLatestCSVUrl();
+        const data = await fetchCSVData(result.url);
+
+        document.getElementById('dataDate').textContent = `Πληρότητα Φραγμάτων ${result.date}`;
+
+        const filteredData = data.filter(d => d.capacity > 0);
+        filteredData.sort((a, b) => b.capacity - a.capacity);
+
+        const totalCapacity = filteredData.reduce((sum, d) => sum + d.capacity, 0);
+        const totalStored = filteredData.reduce((sum, d) => sum + (d.capacity * d.percent / 100), 0);
+        const totalPercent = totalStored / totalCapacity * 100;
+
+        document.getElementById('totalLabel').textContent = `Συνολική Πληρότητα: ${totalPercent.toFixed(2)}%`;
+        document.getElementById('totalFill').style.width = `${totalPercent.toFixed(2)}%`;
+
+        const container = document.getElementById('damDashboard');
+        container.innerHTML = '';
+        filteredData.forEach(dam => {
+          container.appendChild(createTank(dam));
+        });
+      } catch (err) {
+        alert('Failed to load dam data: ' + err.message);
+      }
+    }
+
+    renderDashboard();
+  </script>
+</body>
+</html>
