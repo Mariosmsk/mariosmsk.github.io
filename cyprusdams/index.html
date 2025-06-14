@@ -62,6 +62,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      cursor: pointer;
     }
 
     .tank-name {
@@ -93,6 +94,11 @@
       font-size: 0.95rem;
       color: #444;
       font-weight: bold;
+    }
+
+    .tank:hover {
+      background-color: #eef6ff;
+      box-shadow: 0 0 0 2px #0074d9 inset;
     }
 
     @media (max-width: 600px) {
@@ -169,7 +175,7 @@
       }).filter(d => !isNaN(d.percent) && !isNaN(d.capacity));
     }
 
-    function createTank({ name, percent }) {
+    function createTank({ name, percent, capacity }) {
       const tank = document.createElement('div');
       tank.className = 'tank';
 
@@ -187,6 +193,8 @@
       const label = document.createElement('div');
       label.className = 'tank-percent';
       label.textContent = percent.toFixed(2) + '%';
+
+      tank.title = `Πληρότητα: ${percent.toFixed(2)}%\nΧωρητικότητα: ${capacity.toFixed(2)} MCM`;
 
       visual.appendChild(fill);
       tank.appendChild(nameDiv);
