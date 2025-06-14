@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="el">
 <head>
   <meta charset="UTF-8" />
   <title>Cyprus Dam Storage Dashboard</title>
@@ -11,32 +11,44 @@
       color: #333;
     }
 
-    .nav-buttons {
-      text-align: center;
+    #dateNav {
+      display: flex;
+      justify-content: center;
+      align-items: center;
       margin-bottom: 1rem;
-    }
-
-    .nav-buttons button {
-      font-size: 0.95rem;
-      padding: 0.4rem 0.8rem;
-      margin: 0 0.5rem;
-      background-color: #0074d9;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-
-    .nav-buttons button:hover {
-      background-color: #005fa3;
+      gap: 1rem;
     }
 
     #dataDate {
-      text-align: center;
       font-size: 1.5rem;
-      color: #0074d9;
       font-weight: bold;
-      margin-bottom: 1rem;
+      color: #0074d9;
+      white-space: nowrap;
+    }
+
+    .arrow {
+      width: 0;
+      height: 0;
+      border: none;
+      background: none;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .arrow.left {
+      border-top: 12px solid transparent;
+      border-bottom: 12px solid transparent;
+      border-right: 18px solid #0074d9;
+    }
+
+    .arrow.right {
+      border-top: 12px solid transparent;
+      border-bottom: 12px solid transparent;
+      border-left: 18px solid #0074d9;
+    }
+
+    .arrow:hover {
+      filter: brightness(1.4);
     }
 
     #totalContainer {
@@ -65,13 +77,6 @@
       background-color: #0074d9;
       width: 0%;
       transition: width 0.5s ease;
-    }
-
-    #changeLabel {
-      text-align: center;
-      font-size: 1rem;
-      font-weight: bold;
-      margin-top: 0.5rem;
     }
 
     #tooltip {
@@ -140,8 +145,9 @@
         font-size: 1.2rem;
       }
 
-      #totalLabel {
-        font-size: 1rem;
+      .arrow.left,
+      .arrow.right {
+        border-width: 10px 14px;
       }
 
       .tank-visual {
@@ -160,20 +166,20 @@
   </style>
 </head>
 <body>
-  <div class="nav-buttons">
-    <button id="prevBtn">Προηγούμενη</button>
-    <button id="nextBtn">Επόμενη</button>
+  <div id="dateNav">
+    <button id="prevBtn" class="arrow left" aria-label="Previous"></button>
+    <div id="dataDate">Πληρότητα Φραγμάτων</div>
+    <button id="nextBtn" class="arrow right" aria-label="Next"></button>
   </div>
 
-  <div id="dataDate">Πληρότητα Φραγμάτων</div>
   <div id="totalContainer">
     <div id="totalLabel">Συνολική Πληρότητα: --%</div>
     <div id="totalBar">
       <div id="totalFill"></div>
     </div>
-    <div id="changeLabel"></div>
     <div id="tooltip"></div>
   </div>
+
   <div class="dashboard" id="damDashboard"></div>
 
   <script>
@@ -268,7 +274,6 @@
       filteredData.sort((a, b) => b.capacity - a.capacity);
 
       const latestTotal = dataToday.totalPercent;
-      document.getElementById("totalLabel").textContent = `Συνολική Πληρότητα: ${latestTotal.toFixed(2)}%`;
       document.getElementById("totalFill").style.width = `${latestTotal.toFixed(2)}%`;
 
       const container = document.getElementById('damDashboard');
@@ -286,11 +291,11 @@
           const diff = latestTotal - oldTotal;
           const icon = diff >= 0 ? '🟢 ↑' : '🔴 ↓';
           const sign = diff >= 0 ? '+' : '';
-          document.getElementById("changeLabel").textContent = `${icon} Αλλαγή 10 ημερών: ${sign}${diff.toFixed(2)}%`;
-          document.getElementById("tooltip").textContent = `Από ${oldTotal.toFixed(2)}% σε ${latestTotal.toFixed(2)}%`;
+          const label = `Συνολική Πληρότητα: ${latestTotal.toFixed(2)}% (${icon} Αλλαγή 10 ημερών: ${sign}${diff.toFixed(2)}%)`;
+          document.getElementById("totalLabel").textContent = label;
         }
       } else {
-        document.getElementById("changeLabel").textContent = '';
+        document.getElementById("totalLabel").textContent = `Συνολική Πληρότητα: ${latestTotal.toFixed(2)}%`;
         document.getElementById("tooltip").textContent = '';
       }
     }
