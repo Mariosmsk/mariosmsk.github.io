@@ -11,6 +11,26 @@
       color: #333;
     }
 
+    .nav-buttons {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    .nav-buttons button {
+      font-size: 0.95rem;
+      padding: 0.4rem 0.8rem;
+      margin: 0 0.5rem;
+      background-color: #0074d9;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .nav-buttons button:hover {
+      background-color: #005fa3;
+    }
+
     #dataDate {
       text-align: center;
       font-size: 1.5rem;
@@ -45,6 +65,20 @@
       background-color: #0074d9;
       width: 0%;
       transition: width 0.5s ease;
+    }
+
+    #changeLabel {
+      text-align: center;
+      font-size: 1rem;
+      font-weight: bold;
+      margin-top: 0.5rem;
+    }
+
+    #tooltip {
+      text-align: center;
+      margin-top: 0.3rem;
+      font-size: 0.9rem;
+      color: #555;
     }
 
     .dashboard {
@@ -126,53 +160,69 @@
   </style>
 </head>
 <body>
+  <div class="nav-buttons">
+    <button id="prevBtn">Προηγούμενη</button>
+    <button id="nextBtn">Επόμενη</button>
+  </div>
+
   <div id="dataDate">Πληρότητα Φραγμάτων</div>
   <div id="totalContainer">
     <div id="totalLabel">Συνολική Πληρότητα: --%</div>
     <div id="totalBar">
       <div id="totalFill"></div>
     </div>
+    <div id="changeLabel"></div>
+    <div id="tooltip"></div>
   </div>
   <div class="dashboard" id="damDashboard"></div>
 
   <script>
-    async function fetchLatestCSVUrl() {
-      const baseUrl = 'https://raw.githubusercontent.com/opendatacy/cyprusdams/main/daily/';
-      const today = new Date();
+    let availableDates = [];
+    let currentDate = null;
 
-      for (let i = 0; i < 10; i++) {
-        const dateStr = today.toISOString().split('T')[0];
-        const testUrl = `${baseUrl}${dateStr}.csv`;
-        try {
-          const res = await fetch(testUrl);
-          if (res.ok) return { url: testUrl, date: dateStr };
-        } catch {}
-        today.setDate(today.getDate() - 1);
-      }
-
-      throw new Error('No recent CSV data found.');
+    async function fetchAvailableDates() {
+      const response = await fetch("https://api.github.com/repos/opendatacy/cyprusdams/contents/daily");
+      if (!response.ok) throw new Error("Could not fetch date list");
+      const files = await response.json();
+      return files
+        .map(f => f.name)
+        .filter(n => /^\d{4}-\d{2}-\d{2}\.csv$/.test(n))
+        .map(n => n.replace(".csv", ""))
+        .sort();
     }
 
-    async function fetchCSVData(url) {
-      const response = await fetch(url);
-      const text = await response.text();
-      const rows = text.trim().split('\n');
-      const headers = rows[0].split(',');
-      const dataRows = rows.slice(1);
+    async function fetchCSVByDate(dateStr) {
+      const url = `https://raw.githubusercontent.com/opendatacy/cyprusdams/main/daily/${dateStr}.csv`;
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error();
+        const text = await response.text();
+        const rows = text.trim().split('\n');
+        const headers = rows[0].split(',');
+        const dataRows = rows.slice(1);
 
-      const idxName = headers.indexOf('Reservoir');
-      const idxCapacity = headers.indexOf('Capacity_(MCM)');
-      const idxPercent = headers.indexOf('CurrentStorage(%)');
+        const idxName = headers.indexOf('Reservoir');
+        const idxCapacity = headers.indexOf('Capacity_(MCM)');
+        const idxPercent = headers.indexOf('CurrentStorage(%)');
 
-      return dataRows.map(line => {
-        const cols = line.split(',');
-        let name = cols[idxName].trim().replace('Κλήρου-Μαλούντα', 'ΚλήρουΜαλούντα');
-        return {
-          name: name,
-          percent: parseFloat(cols[idxPercent]),
-          capacity: parseFloat(cols[idxCapacity])
-        };
-      }).filter(d => !isNaN(d.percent) && !isNaN(d.capacity));
+        const data = dataRows.map(line => {
+          const cols = line.split(',');
+          let name = cols[idxName].trim().replace('Κλήρου-Μαλούντα', 'ΚλήρουΜαλούντα');
+          return {
+            name: name,
+            percent: parseFloat(cols[idxPercent]),
+            capacity: parseFloat(cols[idxCapacity])
+          };
+        }).filter(d => !isNaN(d.percent) && !isNaN(d.capacity));
+
+        const totalCapacity = data.reduce((sum, d) => sum + d.capacity, 0);
+        const totalStored = data.reduce((sum, d) => sum + (d.capacity * d.percent / 100), 0);
+        const totalPercent = totalStored / totalCapacity * 100;
+
+        return { data, totalPercent };
+      } catch {
+        return null;
+      }
     }
 
     function createTank({ name, percent, capacity }) {
@@ -204,34 +254,65 @@
       return tank;
     }
 
-    async function renderDashboard() {
-      try {
-        const result = await fetchLatestCSVUrl();
-        const data = await fetchCSVData(result.url);
+    async function renderDashboard(date) {
+      const dataToday = await fetchCSVByDate(date);
+      if (!dataToday) {
+        alert("Failed to load dam data: CSV parsing failed.");
+        return;
+      }
 
-        document.getElementById('dataDate').textContent = `Πληρότητα Φραγμάτων ${result.date}`;
+      currentDate = date;
+      document.getElementById('dataDate').textContent = `Πληρότητα Φραγμάτων ${date}`;
 
-        const filteredData = data.filter(d => d.capacity > 0);
-        filteredData.sort((a, b) => b.capacity - a.capacity);
+      const filteredData = dataToday.data.filter(d => d.capacity > 0);
+      filteredData.sort((a, b) => b.capacity - a.capacity);
 
-        const totalCapacity = filteredData.reduce((sum, d) => sum + d.capacity, 0);
-        const totalStored = filteredData.reduce((sum, d) => sum + (d.capacity * d.percent / 100), 0);
-        const totalPercent = totalStored / totalCapacity * 100;
+      const latestTotal = dataToday.totalPercent;
+      document.getElementById("totalLabel").textContent = `Συνολική Πληρότητα: ${latestTotal.toFixed(2)}%`;
+      document.getElementById("totalFill").style.width = `${latestTotal.toFixed(2)}%`;
 
-        document.getElementById('totalLabel').textContent = `Συνολική Πληρότητα: ${totalPercent.toFixed(2)}%`;
-        document.getElementById('totalFill').style.width = `${totalPercent.toFixed(2)}%`;
+      const container = document.getElementById('damDashboard');
+      container.innerHTML = '';
+      filteredData.forEach(dam => {
+        container.appendChild(createTank(dam));
+      });
 
-        const container = document.getElementById('damDashboard');
-        container.innerHTML = '';
-        filteredData.forEach(dam => {
-          container.appendChild(createTank(dam));
-        });
-      } catch (err) {
-        alert('Failed to load dam data: ' + err.message);
+      const pastIndex = availableDates.indexOf(date) - 9;
+      if (pastIndex >= 0) {
+        const oldDateStr = availableDates[pastIndex];
+        const dataOld = await fetchCSVByDate(oldDateStr);
+        if (dataOld) {
+          const oldTotal = dataOld.totalPercent;
+          const diff = latestTotal - oldTotal;
+          const icon = diff >= 0 ? '🟢 ↑' : '🔴 ↓';
+          const sign = diff >= 0 ? '+' : '';
+          document.getElementById("changeLabel").textContent = `${icon} Αλλαγή 10 ημερών: ${sign}${diff.toFixed(2)}%`;
+          document.getElementById("tooltip").textContent = `Από ${oldTotal.toFixed(2)}% σε ${latestTotal.toFixed(2)}%`;
+        }
+      } else {
+        document.getElementById("changeLabel").textContent = '';
+        document.getElementById("tooltip").textContent = '';
       }
     }
 
-    renderDashboard();
+    document.getElementById('prevBtn').addEventListener('click', () => {
+      const idx = availableDates.indexOf(currentDate);
+      if (idx > 0) renderDashboard(availableDates[idx - 1]);
+    });
+
+    document.getElementById('nextBtn').addEventListener('click', () => {
+      const idx = availableDates.indexOf(currentDate);
+      if (idx < availableDates.length - 1) renderDashboard(availableDates[idx + 1]);
+    });
+
+    (async function init() {
+      try {
+        availableDates = await fetchAvailableDates();
+        await renderDashboard(availableDates[availableDates.length - 1]);
+      } catch (e) {
+        alert("Failed to initialize dashboard: " + e.message);
+      }
+    })();
   </script>
 </body>
 </html>
