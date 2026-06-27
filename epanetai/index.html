@@ -161,15 +161,6 @@
     }
     .stat-card .val { font-size: 1.3rem; font-weight: 700; color: var(--accent); }
     .stat-card .lbl { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
-    .provider-btn {
-      flex: 1; padding: 5px 8px; border-radius: 7px;
-      border: 1px solid var(--border); background: var(--surface2);
-      color: var(--muted); font-size: 0.74rem; font-weight: 600;
-      cursor: pointer; transition: all 0.15s; text-align: center;
-    }
-    .provider-btn.active { background: var(--accent2); color: #fff; border-color: var(--accent2); }
-    .provider-btn:hover:not(.active) { background: var(--border); color: var(--text); }
-
     /* ── KNOWLEDGE BADGES ───────────────────── */
     .doc-badges { display: flex; flex-direction: column; gap: 5px; }
     .doc-badge {
@@ -511,29 +502,14 @@
 
   <aside id="sidebar">
 
-    <!-- Provider + API Key -->
+    <!-- API Key -->
     <div class="s-section">
-      <h2>AI Provider</h2>
-      <div class="row" style="margin-bottom:8px">
-        <button class="provider-btn active" id="btn-groq" onclick="switchProvider('groq')">Groq <span style="font-size:0.68rem;opacity:0.75">(primary)</span></button>
-        <button class="provider-btn" id="btn-hf" onclick="switchProvider('hf')">HuggingFace <span style="font-size:0.68rem;opacity:0.75">(secondary)</span></button>
+      <h2>Groq API Key</h2>
+      <div class="row">
+        <input type="password" id="api-key-input" placeholder="gsk_…" autocomplete="off" />
+        <button class="btn" id="save-key-btn">Save</button>
       </div>
-
-      <div id="groq-key-wrap">
-        <div class="row">
-          <input type="password" id="api-key-input" placeholder="gsk_…" autocomplete="off" />
-          <button class="btn" id="save-key-btn">Save</button>
-        </div>
-        <p class="hint">Free at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a> · <strong>Llama 3.3 70B</strong></p>
-      </div>
-
-      <div id="hf-key-wrap" style="display:none">
-        <div class="row">
-          <input type="password" id="hf-key-input" placeholder="hf_…" autocomplete="off" />
-          <button class="btn" id="save-hf-btn">Save</button>
-        </div>
-        <p class="hint">Free at <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">huggingface.co/settings/tokens</a> · <strong>Qwen 2.5 72B</strong></p>
-      </div>
+      <p class="hint">Free key at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a> · <strong>Llama 3.3 70B</strong></p>
     </div>
 
     <!-- File Upload -->
@@ -785,18 +761,14 @@ Out:    wn.write_inpfile('out.inp') | wntr.graphics.plot_network(wn)
 
 // ─── State ────────────────────────────────────────────────────────────
 let apiKey  = localStorage.getItem('groq_api_key') || '';
-let hfKey   = localStorage.getItem('hf_api_key')   || '';
-let provider = localStorage.getItem('ai_provider') || 'groq';
 let inpText = '';
-let history = [];   // [{role:'user'|'assistant', content:'…'}]
+let history = [];
 let loading = false;
 
 // ─── DOM ──────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 const apiKeyInput = $('api-key-input');
 const saveKeyBtn  = $('save-key-btn');
-const hfKeyInput  = $('hf-key-input');
-const saveHfBtn   = $('save-hf-btn');
 const dropZone    = $('drop-zone');
 const fileInput   = $('file-input');
 const fileInfo    = $('file-info');
@@ -813,24 +785,9 @@ const overlay     = $('overlay');
 
 // ─── Init ─────────────────────────────────────────────────────────────
 if (apiKey) apiKeyInput.value = apiKey;
-if (hfKey)  hfKeyInput.value  = hfKey;
-switchProvider(provider, true);
 updateStatus();
 
-// ─── Provider switch ──────────────────────────────────────────────────
-function switchProvider(p, silent) {
-  provider = p;
-  localStorage.setItem('ai_provider', p);
-  $('btn-groq').classList.toggle('active', p === 'groq');
-  $('btn-hf').classList.toggle('active',   p === 'hf');
-  $('groq-key-wrap').style.display = p === 'groq' ? '' : 'none';
-  $('hf-key-wrap').style.display   = p === 'hf'   ? '' : 'none';
-  const badge = document.querySelector('.model-badge');
-  if (badge) badge.textContent = p === 'hf' ? 'HF · Qwen 2.5 72B' : 'Llama 3.3 · 70B';
-  if (!silent) updateStatus();
-}
-
-// ─── Groq API key ─────────────────────────────────────────────────────
+// ─── API key ──────────────────────────────────────────────────────────
 saveKeyBtn.addEventListener('click', () => {
   const v = apiKeyInput.value.trim();
   if (!v) return;
@@ -842,22 +799,8 @@ saveKeyBtn.addEventListener('click', () => {
 });
 apiKeyInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveKeyBtn.click(); });
 
-// ─── HuggingFace API key ───────────────────────────────────────────────
-saveHfBtn.addEventListener('click', () => {
-  const v = hfKeyInput.value.trim();
-  if (!v) return;
-  hfKey = v;
-  localStorage.setItem('hf_api_key', v);
-  updateStatus();
-  saveHfBtn.textContent = 'Saved ✓';
-  setTimeout(() => { saveHfBtn.textContent = 'Save'; }, 1500);
-});
-hfKeyInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveHfBtn.click(); });
-
 function updateStatus() {
-  const key = provider === 'hf' ? hfKey : apiKey;
-  const providerName = provider === 'hf' ? 'HuggingFace' : 'Groq';
-  if (!key) {
+  if (!apiKey) {
     statusDot.className = 'error';
     statusLabel.textContent = 'No API key';
   } else if (!inpText) {
@@ -867,9 +810,9 @@ function updateStatus() {
     statusDot.className = 'ready';
     statusLabel.textContent = 'Ready';
   }
-  chatInput.placeholder = key
+  chatInput.placeholder = apiKey
     ? (inpText ? 'Ask about your EPANET network, EPyT, or WNTR…' : 'Upload a .inp file to start…')
-    : `Add your ${providerName} API key to start…`;
+    : 'Add your Groq API key to start…';
 }
 
 // ─── File upload ──────────────────────────────────────────────────────
@@ -926,38 +869,84 @@ function parseStats(text) {
   $('val-pumps').textContent      = countRows(section(text, 'PUMPS'));
   $('val-valves').textContent     = countRows(section(text, 'VALVES'));
 }
-function networkContext(text) {
-  // Only include hydraulically relevant sections — skip geometry (COORDINATES/VERTICES/LABELS/BACKDROP/TAGS)
-  const ALLOWED  = ['JUNCTIONS','RESERVOIRS','TANKS','PIPES','PUMPS','VALVES',
-                    'STATUS','DEMANDS','PATTERNS','CURVES','CONTROLS','RULES',
-                    'OPTIONS','TIMES','REACTIONS','SOURCES','ENERGY','EMITTERS','QUALITY'];
-  const BIG      = ['JUNCTIONS','PIPES','DEMANDS','PATTERNS'];
-  const MAX_ROWS = 15;   // rows per big section
-  const MAX_CHARS = 2500; // hard cap on total context chars
+function networkStats(text) {
+  // Build a compact statistical summary of the full network
+  const parseRows = name => section(text, name).split('\n')
+    .filter(l => { const t = l.trim(); return t && !t.startsWith(';'); })
+    .map(l => l.trim().split(/\s+/));
 
+  const numCol = (rows, col) => rows.map(r => parseFloat(r[col])).filter(v => !isNaN(v));
+  const statStr = (vals, unit='') => vals.length
+    ? `min=${Math.min(...vals).toFixed(2)} max=${Math.max(...vals).toFixed(2)} avg=${(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2)}${unit}`
+    : 'n/a';
+
+  const jRows = parseRows('JUNCTIONS');
+  const pRows = parseRows('PIPES');
+  const lines = [`=== NETWORK STATISTICS ===`];
+  lines.push(`Counts: ${jRows.length} junctions | ${pRows.length} pipes | ${parseRows('RESERVOIRS').length} reservoirs | ${parseRows('TANKS').length} tanks | ${parseRows('PUMPS').length} pumps | ${parseRows('VALVES').length} valves`);
+  if (jRows.length) {
+    lines.push(`Junction elevation: ${statStr(numCol(jRows,1),'m')}`);
+    lines.push(`Junction base demand: ${statStr(numCol(jRows,2))}`);
+  }
+  if (pRows.length) {
+    lines.push(`Pipe length: ${statStr(numCol(pRows,3),'m')}`);
+    lines.push(`Pipe diameter: ${statStr(numCol(pRows,4),'mm')}`);
+    lines.push(`Pipe roughness: ${statStr(numCol(pRows,5))}`);
+  }
+  const optSec = section(text,'OPTIONS');
+  const unitM = optSec.match(/UNITS\s+(\S+)/i);
+  const hlM   = optSec.match(/HEADLOSS\s+(\S+)/i);
+  const qualM = optSec.match(/QUALITY\s+(\S+)/i);
+  if (unitM||hlM||qualM) lines.push(`Options: units=${unitM?.[1]||'?'} headloss=${hlM?.[1]||'?'} quality=${qualM?.[1]||'?'}`);
+  return lines.join('\n');
+}
+
+function networkContext(text, maxChars, maxRows, question) {
+  if (!text) return '';
+  maxChars = maxChars || 2500;
+  maxRows  = maxRows  || 15;
+
+  const ALLOWED = ['JUNCTIONS','RESERVOIRS','TANKS','PIPES','PUMPS','VALVES',
+                   'STATUS','DEMANDS','PATTERNS','CURVES','CONTROLS','RULES',
+                   'OPTIONS','TIMES','REACTIONS','SOURCES','ENERGY','EMITTERS','QUALITY'];
+  const BIG     = ['JUNCTIONS','PIPES','DEMANDS','PATTERNS'];
+
+  // Always include full stats summary
+  let ctx = networkStats(text) + '\n\n';
+
+  // Smart: extract any node/pipe IDs mentioned in the question and include their rows
+  let smartRows = '';
+  if (question) {
+    const tokens = question.match(/\b[A-Za-z0-9_\-\.]+\b/g) || [];
+    const jSec = section(text, 'JUNCTIONS');
+    const pSec = section(text, 'PIPES');
+    for (const tok of tokens) {
+      const re = new RegExp(`^\\s*${tok.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\s+`, 'm');
+      const jm = jSec.match(re) ? jSec.split('\n').find(l=>new RegExp(`^\\s*${tok}\\s`).test(l)) : null;
+      const pm = pSec.match(re) ? pSec.split('\n').find(l=>new RegExp(`^\\s*${tok}\\s`).test(l)) : null;
+      if (jm) smartRows += `Junction ${tok}: ${jm.trim()}\n`;
+      if (pm) smartRows += `Pipe    ${tok}: ${pm.trim()}\n`;
+    }
+    if (smartRows) ctx += `=== QUERIED ELEMENTS ===\n${smartRows}\n`;
+  }
+
+  // Section data up to limits
   const secs = [...text.matchAll(/^\s*\[(.*?)\]/gm)].map(m => m[1]);
-  const header = [
-    `=== NETWORK: ${$('val-junctions').textContent} junctions | ${$('val-pipes').textContent} pipes | ` +
-    `${$('val-reservoirs').textContent} reservoirs | ${$('val-tanks').textContent} tanks | ` +
-    `${$('val-pumps').textContent} pumps | ${$('val-valves').textContent} valves`,
-    `Sections present: ${secs.join(', ')}`, ''
-  ].join('\n');
-
   let body = '';
   for (const name of secs) {
     if (!ALLOWED.includes(name.toUpperCase())) continue;
-    if (body.length >= MAX_CHARS) { body += '\n… [remaining sections omitted — ask me about specifics]'; break; }
+    if (body.length >= maxChars) { body += '\n… [truncated — ask about specific IDs]'; break; }
     const raw = section(text, name);
     if (!raw.trim()) continue;
     const rows = raw.split('\n').filter(l => { const t = l.trim(); return t && !t.startsWith(';'); });
     const isBig = BIG.includes(name.toUpperCase());
-    const kept  = isBig && rows.length > MAX_ROWS ? rows.slice(0, MAX_ROWS) : rows;
+    const kept  = isBig && rows.length > maxRows ? rows.slice(0, maxRows) : rows;
     body += `[${name}]\n${kept.join('\n')}`;
-    if (isBig && rows.length > MAX_ROWS) body += `\n… (${rows.length - MAX_ROWS} more — ask to see them)`;
+    if (isBig && rows.length > maxRows) body += `\n… (${rows.length - maxRows} more rows — ask by ID)`;
     body += '\n\n';
   }
 
-  return header + body.slice(0, MAX_CHARS);
+  return ctx + body.slice(0, maxChars);
 }
 
 // ─── Chat helpers ─────────────────────────────────────────────────────
@@ -985,6 +974,7 @@ function addMsg(role, text) {
   wrap.appendChild(av); wrap.appendChild(bub);
   messages.appendChild(wrap);
   messages.scrollTop = messages.scrollHeight;
+  return wrap;
 }
 
 function showTyping() {
@@ -1048,7 +1038,7 @@ async function send(text) {
   const systemPrompt =
     `You are an expert EPANET AI Assistant for water engineers and researchers.\n\n` +
     `You have deep knowledge of EPANET 2.3, the EPyT Python Toolkit, and WNTR.\n\n` +
-    KNOWLEDGE + '\n\n' + networkContext(inpText) +
+    KNOWLEDGE + '\n\n' + networkContext(inpText, 2500, 15, text) +
     `\n\nRules:\n` +
     `- Use the actual node/link IDs from the uploaded .inp when writing code examples.\n` +
     `- Format answers with markdown: **bold**, \`code\`, \`\`\`python blocks\`\`\`, bullet lists.\n` +
@@ -1060,44 +1050,38 @@ async function send(text) {
     { role: 'user',      content: text }
   ];
 
-  // ── Provider config ────────────────────────────────────────────
-  const isHF = provider === 'hf';
-  const activeKey = isHF ? hfKey : apiKey;
-  const endpoint  = isHF
-    ? 'https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct/v1/chat/completions'
-    : 'https://api.groq.com/openai/v1/chat/completions';
-  const model     = isHF
-    ? 'Qwen/Qwen2.5-72B-Instruct'
-    : 'llama-3.3-70b-versatile';
-  const keyLink   = isHF
-    ? '[huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)'
-    : '[console.groq.com](https://console.groq.com)';
-
-  if (!activeKey) {
+  if (!apiKey) {
     hideTyping();
-    addMsg('ai', `**No API key set.** Add your ${isHF ? 'HuggingFace' : 'Groq'} key in the sidebar.`);
+    addMsg('ai', '**No API key set.** Add your Groq key in the sidebar.');
     loading = false; sendBtn.disabled = false; chatInput.focus();
     return;
   }
 
-  const callAPI = () => fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeKey}` },
-    body: JSON.stringify({ model, messages: msgs, max_tokens: 1200, temperature: 0.4 })
-  });
+  const callAPI = () => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 30000);
+    return fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: msgs, max_tokens: 1200, temperature: 0.4 })
+    }).finally(() => clearTimeout(timer));
+  };
 
   try {
     const res  = await callAPI();
     const data = await res.json();
 
-    // Rate-limit: parse retry delay and auto-retry once (Groq only sends retry hints)
+    // Rate-limit: parse retry delay and auto-retry once
     if (res.status === 429) {
       const errMsg = data?.error?.message || '';
+      const retryAfter = res.headers.get('retry-after') || res.headers.get('x-ratelimit-reset-requests');
       const msMatch = errMsg.match(/try again in (\d+(?:\.\d+)?)ms/i);
       const sMatch  = errMsg.match(/try again in (\d+(?:\.\d+)?)s/i);
-      const delay   = msMatch ? Math.ceil(parseFloat(msMatch[1])) + 200
-                    : sMatch  ? Math.ceil(parseFloat(sMatch[1]) * 1000) + 200
-                    : 3000;
+      const delay   = msMatch     ? Math.ceil(parseFloat(msMatch[1])) + 200
+                    : sMatch      ? Math.ceil(parseFloat(sMatch[1]) * 1000) + 200
+                    : retryAfter  ? Math.ceil(parseFloat(retryAfter) * 1000) + 200
+                    : 5000;
       hideTyping();
       const retryMsg = addMsg('ai', `_Rate limit hit — retrying in ${(delay/1000).toFixed(1)}s…_`);
       await new Promise(r => setTimeout(r, delay));
@@ -1123,7 +1107,10 @@ async function send(text) {
     hideTyping(); addMsg('ai', reply);
   } catch (err) {
     hideTyping();
-    addMsg('ai', `**Error:** ${esc(err.message)}\n\nCheck your key at ${keyLink}.`);
+    const msg = err.name === 'AbortError'
+      ? `**Timeout** — no response after 30s. Check your internet connection or try again.`
+      : `**Error:** ${esc(err.message)}\n\nCheck your Groq key at [console.groq.com](https://console.groq.com).`;
+    addMsg('ai', msg);
   } finally {
     loading = false; sendBtn.disabled = false; chatInput.focus();
   }
