@@ -7,7 +7,7 @@
 
 ## Overview
 
-EPANET AI Assistant lets water engineers and researchers upload an EPANET `.inp` file and ask natural-language questions about the network. It is powered by **Llama 3.3 70B** via the [Groq](https://groq.com) API and has built-in knowledge of:
+EPANET AI Assistant lets water engineers and researchers upload an EPANET `.inp` file and ask natural-language questions about the network. It is powered by **Compound Beta** via the [Groq](https://groq.com) API and has built-in knowledge of:
 
 - **EPANET 2.3** — all `.inp` sections, PDA, leakage modeling, PCV valve, new API (ENgetnodevalues, ENgetlinkvalues, ENtimetonextevent…)
 - **EPyT** — EPANET Python Toolkit, 500+ API methods with code examples ([OpenWaterAnalytics/EPyT](https://github.com/OpenWaterAnalytics/EPyT))
@@ -43,7 +43,7 @@ No credit card required.
 2. Go to **API Keys → Create API Key**
 3. Copy the key (starts with `gsk_`)
 
-> **Free tier:** 14,400 requests/day · 6,000 tokens/min · Llama 3.3 70B Versatile
+> **Free tier:** 14,400 requests/day · Compound Beta (free on Groq)
 
 ### 2. Open the App
 
@@ -109,7 +109,7 @@ The `examples/` folder includes **L-TOWN.inp** — the benchmark network from th
 ## Built With
 
 - [Groq API](https://groq.com) — ultra-fast LLM inference
-- [Llama 3.3 70B Versatile](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct) — Meta's open-weight language model
+- [Groq Compound Beta](https://groq.com) — Groq's compound AI system with tool use and web search
 - [EPANET 2.3](https://github.com/OpenWaterAnalytics/EPANET) — hydraulic and water quality modeling
 - [EPyT](https://github.com/OpenWaterAnalytics/EPyT) — EPANET Python Toolkit (KIOS Research Center, University of Cyprus)
 - [WNTR](https://github.com/USEPA/WNTR) — Water Network Tool for Resilience (US EPA)

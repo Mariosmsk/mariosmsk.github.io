@@ -490,7 +490,7 @@
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="10" rx="1"/><rect x="14" y="17" width="7" height="4" rx="1"/></svg>
       Visualize
     </button>
-    <span class="model-badge">Llama 3.3 · 70B</span>
+    <span class="model-badge">Groq · Compound Beta</span>
     <div id="status-dot"></div>
     <span id="status-label">Not configured</span>
   </div>
@@ -604,7 +604,7 @@
              style="color:var(--accent); text-decoration:none">WNTR</a>
         </div>
         <div style="margin-top:6px; color:var(--muted)">
-          Powered by Groq · Llama 3.3 70B
+          Powered by Groq · Compound Beta
         </div>
       </div>
     </div>
@@ -990,7 +990,7 @@ function md(src) {
   return src;
 }
 
-// ─── Send message (Groq / Llama 3.3 70B) ─────────────────────────────
+// ─── Send message (Groq / Compound Beta) ─────────────────────────────
 async function send(text) {
   text = text.trim();
   if (!text || loading) return;
@@ -1023,7 +1023,7 @@ async function send(text) {
     const res  = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: msgs, max_tokens: 1200, temperature: 0.4 })
+      body: JSON.stringify({ model: 'compound-beta', messages: msgs, max_tokens: 1200, temperature: 0.4 })
     });
     const data = await res.json();
 
@@ -1043,7 +1043,7 @@ async function send(text) {
       const res2  = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: msgs, max_tokens: 1200, temperature: 0.4 })
+        body: JSON.stringify({ model: 'compound-beta', messages: msgs, max_tokens: 1200, temperature: 0.4 })
       });
       const data2 = await res2.json();
       if (!res2.ok) throw new Error(data2?.error?.message || `HTTP ${res2.status}`);
