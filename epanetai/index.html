@@ -502,14 +502,23 @@
 
   <aside id="sidebar">
 
-    <!-- API Key -->
+    <!-- API Key + Model -->
     <div class="s-section">
       <h2>Groq API Key</h2>
       <div class="row">
         <input type="password" id="api-key-input" placeholder="gsk_…" autocomplete="off" />
         <button class="btn" id="save-key-btn">Save</button>
       </div>
-      <p class="hint">Free key at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a> · <strong>Llama 3.3 70B</strong></p>
+      <div class="row" style="margin-top:8px">
+        <select id="model-select" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.74rem;color:var(--text);outline:none;cursor:pointer">
+          <option value="llama-3.3-70b-versatile">Llama 3.3 70B (best)</option>
+          <option value="llama-3.1-70b-versatile">Llama 3.1 70B</option>
+          <option value="llama-3.1-8b-instant">Llama 3.1 8B (fast)</option>
+          <option value="gemma2-9b-it">Gemma 2 9B</option>
+          <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+        </select>
+      </div>
+      <p class="hint">Free at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a> — if daily limit hit, switch model above.</p>
     </div>
 
     <!-- File Upload -->
@@ -1057,33 +1066,64 @@ async function send(text) {
     return;
   }
 
-  const callAPI = () => {
+  const modelSel = $('model-select');
+  let activeModel = modelSel ? modelSel.value : 'llama-3.3-70b-versatile';
+
+  const callAPI = (mdl) => {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 30000);
     return fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       signal: ctrl.signal,
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: msgs, max_tokens: 1200, temperature: 0.4 })
+      body: JSON.stringify({ model: mdl || activeModel, messages: msgs, max_tokens: 1200, temperature: 0.4 })
     }).finally(() => clearTimeout(timer));
   };
+
+  // Update badge to show active model
+  const badge = document.querySelector('.model-badge');
+  if (badge) badge.textContent = activeModel.replace('llama-','Llama ').replace('-versatile',' Versatile').replace('-instant',' Instant').replace('gemma2-9b-it','Gemma 2 9B').replace('mixtral-8x7b-32768','Mixtral 8x7B');
 
   try {
     const res  = await callAPI();
     const data = await res.json();
 
-    // Rate-limit: parse retry delay and auto-retry once
+    // Rate-limit handling
     if (res.status === 429) {
       const errMsg = data?.error?.message || '';
-      const retryAfter = res.headers.get('retry-after') || res.headers.get('x-ratelimit-reset-requests');
+      const isDaily = /tokens per day|TPD/i.test(errMsg);
       const msMatch = errMsg.match(/try again in (\d+(?:\.\d+)?)ms/i);
-      const sMatch  = errMsg.match(/try again in (\d+(?:\.\d+)?)s/i);
-      const delay   = msMatch     ? Math.ceil(parseFloat(msMatch[1])) + 200
-                    : sMatch      ? Math.ceil(parseFloat(sMatch[1]) * 1000) + 200
-                    : retryAfter  ? Math.ceil(parseFloat(retryAfter) * 1000) + 200
-                    : 5000;
+      const sMatch  = errMsg.match(/try again in (\d+(?:\.\d+)?)m?(\d+(?:\.\d+)?)s/i);
+      const minMatch= errMsg.match(/try again in (\d+)m/i);
+
+      if (isDaily) {
+        // Daily limit exhausted — auto-switch to fallback model
+        const FALLBACKS = ['llama-3.1-8b-instant','gemma2-9b-it','mixtral-8x7b-32768','llama-3.1-70b-versatile'];
+        const fallback = FALLBACKS.find(m => m !== activeModel);
+        hideTyping();
+        const switchMsg = addMsg('ai', `_Daily limit reached for **${activeModel}** — switching to **${fallback}** automatically…_`);
+        if (modelSel) modelSel.value = fallback;
+        activeModel = fallback;
+        await new Promise(r => setTimeout(r, 1000));
+        switchMsg.remove();
+        showTyping();
+        const res2 = await callAPI(fallback);
+        const data2 = await res2.json();
+        if (!res2.ok) throw new Error(data2?.error?.message || `HTTP ${res2.status}`);
+        const reply2 = data2.choices[0].message.content;
+        history.push({ role: 'user', content: text }); history.push({ role: 'assistant', content: reply2 });
+        if (history.length > 8) history = history.slice(-8);
+        hideTyping(); addMsg('ai', reply2);
+        return;
+      }
+
+      // Per-minute limit — wait and retry
+      const delay = msMatch ? Math.ceil(parseFloat(msMatch[1])) + 200
+                  : sMatch  ? Math.ceil(parseFloat(sMatch[1]) * 1000) + 200
+                  : minMatch? Math.ceil(parseFloat(minMatch[1]) * 60000) + 500
+                  : 4000;
       hideTyping();
-      const retryMsg = addMsg('ai', `_Rate limit hit — retrying in ${(delay/1000).toFixed(1)}s…_`);
+      const retryMsg = addMsg('ai', `_Rate limit — retrying in ${(delay/1000).toFixed(1)}s…_`);
       await new Promise(r => setTimeout(r, delay));
       retryMsg.remove();
       showTyping();
