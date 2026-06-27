@@ -1,0 +1,1495 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EPANET AI Assistant</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #f0f4f8;
+      --surface:    #ffffff;
+      --surface2:   #f1f5f9;
+      --border:     #d1dce8;
+      --accent:     #0284c7;
+      --accent2:    #0369a1;
+      --text:       #1e293b;
+      --muted:      #64748b;
+      --danger:     #dc2626;
+      --success:    #16a34a;
+      --radius:     12px;
+      --font:       'Segoe UI', system-ui, sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── HEADER ─────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    header svg      { color: var(--accent); flex-shrink: 0; }
+    header h1       { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.3px; }
+    header p        { font-size: 0.78rem; color: var(--muted); margin-top: 1px; }
+    .header-right   { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .model-badge {
+      font-size: 0.68rem; font-weight: 600;
+      background: rgba(56,189,248,0.12);
+      border: 1px solid rgba(56,189,248,0.25);
+      color: var(--accent);
+      border-radius: 6px;
+      padding: 2px 7px;
+    }
+    #status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+    #status-dot.ready { background: var(--success); }
+    #status-dot.error { background: var(--danger); }
+    #status-label { font-size: 0.75rem; color: var(--muted); }
+
+    /* ── LAYOUT ─────────────────────────────── */
+    .layout { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── SIDEBAR ────────────────────────────── */
+    aside {
+      width: 300px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .s-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .s-section:last-child { margin-top: auto; border-bottom: none; }
+    .s-section h2 {
+      font-size: 0.7rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--muted); margin-bottom: 10px;
+    }
+
+    /* ── FORMS ──────────────────────────────── */
+    .row       { display: flex; gap: 6px; }
+    input[type="password"] {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: var(--text);
+      font-size: 0.82rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input[type="password"]:focus { border-color: var(--accent); }
+
+    .btn {
+      background: var(--accent2); color: #fff;
+      border: none; border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; white-space: nowrap;
+      transition: background 0.2s;
+    }
+    .btn:hover    { background: var(--accent); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+
+    .hint { font-size: 0.72rem; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+    .hint a { color: var(--accent); text-decoration: none; }
+    .hint a:hover { text-decoration: underline; }
+
+    /* ── FILE DROP ──────────────────────────── */
+    #drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 20px; text-align: center;
+      cursor: pointer; color: var(--muted); font-size: 0.82rem;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(56,189,248,0.05);
+      color: var(--text);
+    }
+    #drop-zone svg { display: block; margin: 0 auto 8px; opacity: 0.6; }
+    #file-input    { display: none; }
+
+    #file-info {
+      display: none;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 12px; font-size: 0.8rem;
+    }
+    #file-info .fname { font-weight: 600; color: var(--accent); word-break: break-all; }
+    #file-info .fmeta { color: var(--muted); margin-top: 2px; }
+    #remove-file {
+      margin-top: 8px; font-size: 0.75rem;
+      background: none; border: none; color: var(--danger);
+      cursor: pointer; padding: 0; text-decoration: underline;
+    }
+
+    /* ── STATS ──────────────────────────────── */
+    #stats-section { display: none; }
+    #stats-grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat-card {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px;
+    }
+    .stat-card .val { font-size: 1.3rem; font-weight: 700; color: var(--accent); }
+    .stat-card .lbl { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+    /* ── KNOWLEDGE BADGES ───────────────────── */
+    .doc-badges { display: flex; flex-direction: column; gap: 5px; }
+    .doc-badge {
+      display: flex; align-items: flex-start; gap: 8px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 7px; padding: 7px 9px; font-size: 0.75rem;
+    }
+    .doc-badge .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--success); flex-shrink: 0; margin-top: 4px;
+    }
+    .doc-badge strong { color: var(--text); display: block; }
+    .doc-badge span   { color: var(--muted); }
+
+    /* ── SUGGESTIONS ────────────────────────── */
+    #suggestions { display: flex; flex-direction: column; gap: 6px; }
+    .sug-btn {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 10px;
+      color: var(--text); font-size: 0.78rem;
+      cursor: pointer; text-align: left;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .sug-btn:hover  { border-color: var(--accent); background: rgba(56,189,248,0.06); }
+    .sug-btn:active { transform: scale(0.98); }
+
+    /* ── CHAT MAIN ──────────────────────────── */
+    main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    #messages {
+      flex: 1; overflow-y: auto;
+      padding: 20px; display: flex; flex-direction: column;
+      gap: 16px; scroll-behavior: smooth;
+    }
+
+    .msg          { display: flex; gap: 10px; max-width: 820px; width: 100%; }
+    .msg.user     { flex-direction: row-reverse; align-self: flex-end; }
+    .msg.ai       { align-self: flex-start; }
+
+    .avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 700; flex-shrink: 0;
+    }
+    .msg.user .avatar { background: #0369a1; color: #fff; }
+    .msg.ai   .avatar { background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff; }
+
+    .bubble {
+      padding: 12px 16px; border-radius: var(--radius);
+      font-size: 0.88rem; line-height: 1.65;
+      max-width: calc(100% - 44px);
+    }
+    .msg.user .bubble {
+      background: #0369a1; color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .msg.ai .bubble {
+      background: var(--surface); border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+
+    /* Markdown inside bubbles */
+    .bubble code {
+      background: rgba(2,132,199,0.08); border-radius: 4px;
+      padding: 1px 5px; color: var(--accent2);
+      font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.82em;
+    }
+    .bubble pre {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px; overflow-x: auto; margin: 8px 0;
+    }
+    .bubble pre code { background: none; padding: 0; font-size: 0.85em; color: var(--text); }
+    .bubble strong   { font-weight: 700; }
+    .bubble em       { font-style: italic; }
+    .bubble h3, .bubble h4 {
+      font-size: 0.95em; font-weight: 700;
+      margin: 10px 0 4px; color: var(--accent2);
+    }
+    .bubble ul, .bubble ol { padding-left: 20px; margin: 6px 0; }
+    .bubble li { margin: 3px 0; }
+    .bubble p  { margin: 4px 0; }
+    .bubble table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 0.82em; }
+    .bubble th, .bubble td { border: 1px solid var(--border); padding: 5px 9px; }
+    .bubble th { background: var(--surface2); font-weight: 600; }
+
+    /* Typing animation */
+    .dots       { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+    .dots span  {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--muted); animation: bounce 1.2s infinite;
+    }
+    .dots span:nth-child(2) { animation-delay: 0.2s; }
+    .dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30%            { transform: translateY(-6px); }
+    }
+
+    /* Welcome screen */
+    #welcome {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: 40px 20px; gap: 12px; color: var(--muted);
+    }
+    #welcome svg  { opacity: 0.15; color: var(--accent); }
+    #welcome h2   { font-size: 1rem; color: var(--text); opacity: 0.7; }
+    #welcome p    { font-size: 0.83rem; max-width: 360px; line-height: 1.6; }
+    #welcome code {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 4px; padding: 1px 5px; font-size: 0.9em;
+    }
+    .steps        { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; text-align: left; }
+    .step         { display: flex; gap: 8px; align-items: flex-start; font-size: 0.8rem; }
+    .step-num {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--surface2); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 700; flex-shrink: 0; color: var(--accent);
+    }
+
+    /* ── INPUT BAR ──────────────────────────── */
+    .input-area {
+      padding: 16px 20px; border-top: 1px solid var(--border);
+      background: var(--surface); display: flex; gap: 10px; align-items: flex-end;
+    }
+    #chat-input {
+      flex: 1;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 10px 14px;
+      color: var(--text); font-size: 0.88rem; font-family: var(--font);
+      outline: none; resize: none; max-height: 140px; line-height: 1.5;
+      transition: border-color 0.2s;
+    }
+    #chat-input:focus       { border-color: var(--accent); }
+    #chat-input::placeholder{ color: var(--muted); }
+    #send-btn {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; padding: 0;
+    }
+    #clear-btn { padding: 8px 10px; font-size: 0.75rem; }
+
+    /* ── SCROLLBAR ──────────────────────────── */
+    ::-webkit-scrollbar       { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    /* ── MOBILE ─────────────────────────────── */
+    #menu-btn {
+      display: none;
+      background: none; border: none; color: var(--text);
+      cursor: pointer; padding: 4px; border-radius: 6px;
+      align-items: center; justify-content: center;
+    }
+    #menu-btn:hover { background: var(--surface2); }
+    #overlay        { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99; }
+    #overlay.show   { display: block; }
+    @media (max-width: 640px) {
+      #menu-btn { display: flex; }
+      aside {
+        position: fixed; left: -300px; top: 0; bottom: 0; z-index: 100;
+        transition: left 0.3s; box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+      }
+      aside.open { left: 0; }
+    }
+
+    /* ── VIZ PANEL ──────────────────────────── */
+    .viz-panel {
+      width: 420px; flex-shrink: 0;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+      transition: width 0.25s;
+    }
+    .viz-panel.hidden { width: 0; border-left: none; overflow: hidden; }
+
+    .viz-tabbar {
+      display: flex; align-items: center; gap: 2px;
+      padding: 8px 10px; border-bottom: 1px solid var(--border);
+      background: var(--surface); flex-shrink: 0;
+    }
+    .viz-tab {
+      padding: 5px 12px; border-radius: 6px; border: none;
+      font-size: 0.77rem; font-weight: 600; cursor: pointer;
+      background: transparent; color: var(--muted);
+      transition: all 0.15s;
+    }
+    .viz-tab.active { background: var(--accent2); color: #fff; }
+    .viz-tab:hover:not(.active) { background: var(--surface2); color: var(--text); }
+
+    .viz-pane { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+    .viz-pane.active { display: flex; }
+
+    /* Map */
+    #net-wrap {
+      flex: 1; position: relative; background: var(--bg); overflow: hidden;
+    }
+    #net-wrap svg { width: 100%; height: 100%; cursor: grab; display: block; }
+    #net-wrap svg:active { cursor: grabbing; }
+    .map-ctrl {
+      position: absolute; top: 8px; right: 8px;
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .map-btn {
+      width: 28px; height: 28px; border-radius: 6px;
+      background: white; border: 1px solid var(--border);
+      cursor: pointer; font-size: 0.9rem; font-weight: bold;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    .map-btn:hover { background: var(--surface2); }
+    #net-tooltip {
+      position: absolute; pointer-events: none; z-index: 10;
+      background: rgba(15,23,42,0.92); color: #fff;
+      border-radius: 7px; padding: 7px 11px; font-size: 0.72rem;
+      line-height: 1.5; display: none; max-width: 200px;
+    }
+    .color-legend {
+      position: absolute; bottom: 8px; left: 8px;
+      background: rgba(255,255,255,0.93); border: 1px solid var(--border);
+      border-radius: 8px; padding: 7px 10px; font-size: 0.7rem; min-width: 120px;
+    }
+    .legend-bar {
+      height: 7px; border-radius: 4px; margin: 4px 0;
+      background: linear-gradient(to right,#16a34a,#facc15,#dc2626);
+    }
+    .legend-row { display: flex; justify-content: space-between; color: var(--muted); }
+    .map-footer {
+      flex-shrink: 0; padding: 6px 10px;
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px; font-size: 0.72rem;
+    }
+    .map-footer select {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; padding: 3px 6px; font-size: 0.72rem;
+      color: var(--text); outline: none; cursor: pointer;
+    }
+    #map-info { margin-left: auto; color: var(--muted); }
+
+    /* Charts */
+    .ctab-bar {
+      display: flex; gap: 2px; padding: 8px 10px 0;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .ctab {
+      padding: 4px 10px; border: none; background: transparent;
+      font-size: 0.74rem; font-weight: 600; cursor: pointer;
+      color: var(--muted); border-bottom: 2px solid transparent;
+      transition: all 0.15s; margin-bottom: -1px;
+    }
+    .ctab.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+    .ctab:hover:not(.active) { color: var(--text); }
+    .chart-wrap {
+      flex: 1; padding: 12px; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .chart-wrap canvas { max-width: 100%; max-height: 100%; }
+    #no-patterns {
+      color: var(--muted); font-size: 0.82rem; text-align: center;
+    }
+
+    /* Simulate */
+    .sim-body { padding: 16px; overflow-y: auto; flex: 1; }
+    .sim-body p { font-size: 0.82rem; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
+    #sim-status { font-size: 0.8rem; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+    .sim-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;
+    }
+    .sim-stat {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px;
+    }
+    .sim-stat .sv { font-size: 1.2rem; font-weight: 700; color: var(--accent2); }
+    .sim-stat .sl { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+
+    /* Viz empty / no-coords */
+    .viz-empty {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: var(--muted); font-size: 0.82rem;
+      gap: 8px; padding: 20px; text-align: center;
+    }
+    .viz-empty svg { opacity: 0.15; color: var(--accent); }
+
+    /* Viz toggle btn (header) */
+    #viz-toggle-btn {
+      background: none; border: 1px solid var(--border);
+      border-radius: 7px; cursor: pointer; color: var(--muted);
+      padding: 4px 10px; font-size: 0.74rem; font-weight: 600;
+      display: flex; align-items: center; gap: 5px;
+      transition: all 0.15s;
+    }
+    #viz-toggle-btn:hover { background: var(--surface2); color: var(--text); }
+    #viz-toggle-btn.on { color: var(--accent2); border-color: var(--accent2); background: rgba(2,132,199,0.07); }
+
+    @media (max-width: 860px) {
+      .viz-panel:not(.hidden) {
+        position: fixed; right: 0; top: 53px; bottom: 0;
+        z-index: 50; box-shadow: -4px 0 20px rgba(0,0,0,0.1);
+        width: min(420px, 96vw) !important;
+      }
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
+</head>
+<body>
+
+<header>
+  <button id="menu-btn" aria-label="Toggle sidebar">
+    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path d="M3 6h18M3 12h18M3 18h18"/>
+    </svg>
+  </button>
+  <!-- Globe icon -->
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+    <circle cx="12" cy="12" r="10"/>
+    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+  </svg>
+  <div>
+    <h1>EPANET AI Assistant</h1>
+    <p>Water Network Analysis · <a href="https://github.com/OpenWaterAnalytics" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">Open Water Analytics</a></p>
+  </div>
+  <div class="header-right">
+    <button id="viz-toggle-btn" onclick="toggleViz()" title="Toggle visualization panel">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="10" rx="1"/><rect x="14" y="17" width="7" height="4" rx="1"/></svg>
+      Visualize
+    </button>
+    <span class="model-badge">Llama 3.3 · 70B</span>
+    <div id="status-dot"></div>
+    <span id="status-label">Not configured</span>
+  </div>
+</header>
+
+<div id="overlay"></div>
+
+<div class="layout">
+
+  <aside id="sidebar">
+
+    <!-- API Key -->
+    <div class="s-section">
+      <h2>Groq API Key</h2>
+      <div class="row">
+        <input type="password" id="api-key-input" placeholder="gsk_…" autocomplete="off" />
+        <button class="btn" id="save-key-btn">Save</button>
+      </div>
+      <p class="hint">
+        Free key (no credit card) at
+        <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a>.
+        Stored only in your browser.
+      </p>
+    </div>
+
+    <!-- File Upload -->
+    <div class="s-section">
+      <h2>EPANET .inp File</h2>
+      <div id="drop-zone" role="button" tabindex="0" aria-label="Upload .inp file">
+        <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+          <polyline points="16 12 12 8 8 12"/>
+          <line x1="12" y1="8" x2="12" y2="20"/>
+        </svg>
+        Click or drop your .inp file here
+      </div>
+      <input type="file" id="file-input" accept=".inp,.INP" />
+      <div id="file-info">
+        <div class="fname" id="file-name"></div>
+        <div class="fmeta" id="file-meta"></div>
+        <button id="remove-file">Remove file</button>
+      </div>
+    </div>
+
+    <!-- Network Stats (hidden until file loaded) -->
+    <div class="s-section" id="stats-section">
+      <h2>Network Summary</h2>
+      <div id="stats-grid">
+        <div class="stat-card"><div class="val" id="val-junctions">—</div><div class="lbl">Junctions</div></div>
+        <div class="stat-card"><div class="val" id="val-pipes">—</div><div class="lbl">Pipes</div></div>
+        <div class="stat-card"><div class="val" id="val-reservoirs">—</div><div class="lbl">Reservoirs</div></div>
+        <div class="stat-card"><div class="val" id="val-tanks">—</div><div class="lbl">Tanks</div></div>
+        <div class="stat-card"><div class="val" id="val-pumps">—</div><div class="lbl">Pumps</div></div>
+        <div class="stat-card"><div class="val" id="val-valves">—</div><div class="lbl">Valves</div></div>
+      </div>
+    </div>
+
+    <!-- Knowledge Base -->
+    <div class="s-section">
+      <h2>Built-in Knowledge</h2>
+      <div class="doc-badges">
+        <div class="doc-badge">
+          <div class="dot"></div>
+          <div><strong>EPANET 2.3</strong><span>All .inp sections, hydraulics, PDA, leakage, water quality</span></div>
+        </div>
+        <div class="doc-badge">
+          <div class="dot"></div>
+          <div><strong>EPyT</strong><span>EPANET Python Toolkit — 500+ API methods &amp; examples</span></div>
+        </div>
+        <div class="doc-badge">
+          <div class="dot"></div>
+          <div><strong>WNTR</strong><span>Resilience analysis, pressure-driven simulation</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Suggested Questions -->
+    <div class="s-section">
+      <h2>Suggested Questions</h2>
+      <div id="suggestions">
+        <button class="sug-btn">Summarize this network</button>
+        <button class="sug-btn">What are the pipe diameters and lengths?</button>
+        <button class="sug-btn">List all reservoirs and their head values</button>
+        <button class="sug-btn">Show the demand patterns in this model</button>
+        <button class="sug-btn">Are there any potential pressure problems?</button>
+        <button class="sug-btn">What pump curves are defined?</button>
+        <button class="sug-btn">Explain the valve settings</button>
+        <button class="sug-btn">How do I run this network with EPyT in Python?</button>
+        <button class="sug-btn">How do I analyze this network with WNTR?</button>
+        <button class="sug-btn">How do I add a leak to a pipe using WNTR?</button>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="s-section">
+      <div style="text-align:center; font-size:0.72rem; color:var(--muted); line-height:1.7">
+        <div style="margin-bottom:6px">
+          <a href="https://github.com/OpenWaterAnalytics" target="_blank" rel="noopener"
+             style="color:var(--accent2); text-decoration:none; font-weight:600">
+            Open Water Analytics
+          </a>
+        </div>
+        <div>
+          <a href="https://github.com/OpenWaterAnalytics/EPyT" target="_blank" rel="noopener"
+             style="color:var(--accent); text-decoration:none">EPyT</a>
+          ·
+          <a href="https://github.com/OpenWaterAnalytics/EPANET" target="_blank" rel="noopener"
+             style="color:var(--accent); text-decoration:none">EPANET</a>
+          ·
+          <a href="https://github.com/USEPA/WNTR" target="_blank" rel="noopener"
+             style="color:var(--accent); text-decoration:none">WNTR</a>
+        </div>
+        <div style="margin-top:6px; color:var(--muted)">
+          Powered by Groq · Llama 3.3 70B
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <main>
+    <div id="messages">
+      <div id="welcome">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        <h2>EPANET AI Assistant</h2>
+        <p>Ask anything about your water network model. Knows EPANET 2.3, EPyT, and WNTR.</p>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <span>Get a free Groq key at <a href="https://console.groq.com/keys" target="_blank" rel="noopener" style="color:var(--accent)">console.groq.com</a> and save it</span>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <span>Upload your EPANET <code>.inp</code> file</span>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <span>Ask questions or pick from the suggestions on the left</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <textarea id="chat-input" rows="1"
+        placeholder="Ask about your EPANET network, EPyT, or WNTR…"></textarea>
+      <button class="btn btn-ghost" id="clear-btn" title="Clear conversation">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </button>
+      <button class="btn" id="send-btn" title="Send (Enter)">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+  </main>
+
+  <!-- ── VIZ PANEL ─────────────────────────────────────────────── -->
+  <div class="viz-panel hidden" id="viz-panel">
+
+    <!-- Tab bar -->
+    <div class="viz-tabbar">
+      <button class="viz-tab active" onclick="switchVizTab('map',this)">🗺 Map</button>
+      <button class="viz-tab" onclick="switchVizTab('charts',this)">📊 Charts</button>
+      <button class="viz-tab" onclick="switchVizTab('sim',this)">⚙ Simulate</button>
+    </div>
+
+    <!-- MAP -->
+    <div class="viz-pane active" id="vp-map">
+      <div id="net-wrap">
+        <svg id="net-svg" xmlns="http://www.w3.org/2000/svg">
+          <g id="svg-group"></g>
+        </svg>
+        <div class="map-ctrl">
+          <button class="map-btn" onclick="svgZoom(1.3)" title="Zoom in">+</button>
+          <button class="map-btn" onclick="svgZoom(0.77)" title="Zoom out">−</button>
+          <button class="map-btn" onclick="svgReset()" title="Reset view">⌂</button>
+        </div>
+        <div id="net-tooltip"></div>
+        <div class="color-legend" id="color-legend" style="display:none">
+          <div style="font-size:0.7rem;font-weight:600;color:var(--text);margin-bottom:4px" id="legend-title">Elevation (m)</div>
+          <div class="legend-bar"></div>
+          <div class="legend-row"><span id="leg-lo">low</span><span id="leg-hi">high</span></div>
+        </div>
+      </div>
+      <div class="map-footer">
+        <label style="font-size:0.72rem;color:var(--muted)">Color:</label>
+        <select id="color-mode" onchange="drawNetwork(this.value)">
+          <option value="type">Type</option>
+          <option value="elev">Elevation</option>
+          <option value="demand">Base Demand</option>
+          <option value="pressure">Pressure (sim)</option>
+        </select>
+        <span id="map-info">Load a .inp file to see the map</span>
+      </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="viz-pane" id="vp-charts">
+      <div class="ctab-bar">
+        <button class="ctab active" onclick="switchCTab('pattern',this)">Demand Pattern</button>
+        <button class="ctab" onclick="switchCTab('elev',this)">Elevation</button>
+        <button class="ctab" onclick="switchCTab('diam',this)">Pipe Diameter</button>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="main-chart"></canvas>
+        <div id="no-patterns" style="display:none">No demand patterns found in network</div>
+      </div>
+    </div>
+
+    <!-- SIMULATE -->
+    <div class="viz-pane" id="vp-sim">
+      <div class="sim-body">
+        <p>Run a hydraulic snapshot using the EPANET engine in WebAssembly — no server required.</p>
+        <button class="btn primary" id="sim-btn" onclick="runSim()" disabled style="width:100%">Load a .inp file first</button>
+        <div id="sim-status"></div>
+        <div class="sim-grid" id="sim-grid" style="display:none">
+          <div class="sim-stat"><div class="sv" id="sv-nodes">—</div><div class="sl">Nodes simulated</div></div>
+          <div class="sim-stat"><div class="sv" id="sv-pipes">—</div><div class="sl">Links simulated</div></div>
+          <div class="sim-stat"><div class="sv" id="sv-pmin">—</div><div class="sl">Min pressure (m)</div></div>
+          <div class="sim-stat"><div class="sv" id="sv-pmax">—</div><div class="sl">Max pressure (m)</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /viz-panel -->
+
+</div>
+
+<script>
+// ─── Built-in knowledge (ultra-compact — EPANET 2.3 + EPyT + WNTR) ──────
+const KNOWLEDGE = `
+=== EPANET 2.3 ===
+Sections: [JUNCTIONS] ID Elev Demand Pat | [RESERVOIRS] ID Head Pat | [TANKS] ID Elev Init Min Max Diam | [PIPES] ID N1 N2 Len Diam Rough Loss Status(Open/Closed/CV) | [PUMPS] ID N1 N2 HEAD/POWER keyword-pairs | [VALVES] ID N1 N2 Diam Type(PRV/PSV/PBV/FCV/TCV/GPV/PCV) Setting Loss | [PATTERNS] ID Multipliers | [CURVES] ID X Y (PUMP/EFFICIENCY/VOLUME/HEADLOSS/VALVE) | [CONTROLS] LINK id Open/Closed IF NODE id ABOVE/BELOW val | AT TIME t | [RULES] IF/THEN/ELSE PRIORITY | [OPTIONS] UNITS HEADLOSS QUALITY(NONE/CHEMICAL/TRACE/AGE) DEMAND_MODEL(DDA/PDA) | [TIMES] DURATION TIMESTEPS | [REACTIONS] ORDER GLOBAL BULK WALL | [SOURCES] Node CONCEN/MASS/FLOWPACED/SETPOINT Strength Pat | [ENERGY] GLOBAL EFFICIENCY/PRICE
+Headloss: H-W=10.67×L×Q^1.852/(C^1.852×D^4.87) | D-W=f×L/D×V²/2g
+Units: US=GPM/ft/psi/in | SI=LPS/m/m/mm | CMS added in 2.3 | Quality: CHEMICAL=mg/L decay(K_b<0), TRACE=% from source, AGE=hours
+New in 2.3: PCV valve(pressure control curve) | PDA pressure-driven analysis(EN_DDA=0,EN_PDA=1) | Leakage modeling(leak area+expansion) | Emitter backflow option | Pressure units(EN_PSI=0,EN_KPA=1,EN_METERS=2) | Bulk API: ENgetnodevalues/ENgetlinkvalues | Control/rule enable flags: ENgetcontrolenabled/ENgetruleenabled | ENtimetonextevent(HYD/WQ/TANK/CONTROL events) | ENloadpatternfile | ENopenX(lenient parsing) | Stats: deficient nodes, demand reduction, total leakage loss
+
+=== EPyT (pip install epyt) — supports EPANET 2.3 ===
+from epyt import epanet; d=epanet('net.inp')
+Counts: getNodeCount/JunctionCount/ReservoirCount/TankCount/LinkCount/PipeCount/PumpCount/ValveCount
+Node:   getNodeNameID/Elevations/BaseDemands/Coordinates/Type/TankInitialLevel/TankDiameter
+Link:   getLinkNameID/Length/Diameter/RoughnessCoeff/InitialStatus/NodesIndex/PumpHeadCurveIndex/ValveType
+Pat/Crv: getPatternNameID/Lengths | getCurveNameID/Value/Type(1=PUMP,2=EFFICIENCY,3=VOLUME,4=HEADLOSS,5=VALVE)
+Run:    d.solveCompleteHydraulics(); d.solveCompleteQuality()
+R=d.getComputedHydraulicTimeSeries() → R.Pressure/Head/Demand/Flow/Velocity/HeadLoss/Time [ndarray timesteps×items]
+RQ=d.getComputedQualityTimeSeries() → RQ.NodeQuality/LinkQuality
+Step loop: openHydraulicAnalysis(); initializeHydraulicAnalysis()
+  while tstep>0: t=runHydraulicAnalysis(); P=getNodePressure(); tstep=nextHydraulicAnalysisStep(); closeHydraulicAnalysis()
+Set:    setNodeElevations/BaseDemands | setLinkDiameter/Length/RoughnessCoeff/InitialStatus(1=open,0=closed) | setPattern(idx,vals)
+Add:    addNodeJunction('J',[x,y],elev,dem) | addLinkPipe('P','N1','N2',len,diam,rough) | addNodeReservoir | addLinkPump
+PCV:    addLinkValvePCV('V','N1','N2') | setLinkValveCurvePCV(idx,curve_idx) | getLinkValveCurvePCV(idx)
+GPV:    getLinkValveCurveGPV(idx) | setLinkValveCurveGPV(idx,curve_idx)
+Leakage(2.3): getLinkLeakArea(idx)/setLinkLeakArea(idx,area) | getLinkLeakageRate(idx) | getNodeLeakageFlow(idx) | getNodeEmitterFlow(idx)
+Demand(2.3): getConsumerDemandRequested/Delivered | getStatisticDeficientNodes | getStatisticDemandReduction | getStatisticTotalLeakageLoss
+Control(2.3): getControlState(idx) | getRuleEnabled(idx) | setRuleEnabled(idx,flag) | getLinkInControl | getNodeInControl
+Options(2.3): getOptionsPressureUnits/setOptionsPressureUnits(EN_PSI=0/EN_KPA=1/EN_METERS=2) | getOptionsStatusReport/setOptionsStatusReport
+Patterns(2.3): loadPatternFile('pat.txt',id) | getPatternAverageDefaultValue
+Curves(2.3): setCurveType/setCurveTypeVolume/Pump/Efficiency/Headloss/General/ValveCurve
+Time(2.3): getTimetoNextEvent → (event_type, time_to_event); types: HYD=1,WQ=2,TANK=3,CONTROL=4
+Out:    saveInputFile('out.inp') | plot()/plotPressure()/plotFlow() | openX('net.inp') | unload()
+
+=== WNTR (pip install wntr) ===
+import wntr; wn=wntr.network.WaterNetworkModel('net.inp')
+Lists: node/link/junction/pipe/pump/reservoir/tank/valve_name_list | num_nodes | num_links
+Access: j=wn.get_node('J1') → .base_demand(m³/s)/.elevation | p=wn.get_link('P1') → .length/.diameter/.roughness/.initial_status
+Simulate: results=wntr.sim.EpanetSimulator(wn).run_sim()  # or WNTRSimulator(wn) for pressure-driven
+Results DataFrames (index=sec, cols=IDs): node['pressure'(Pa)/head/demand/quality] | link['flowrate/velocity/headloss']
+  pressure_m = results.node['pressure']/9806.65
+Resilience: wntr.metrics.water_service_availability(demand,wn) | todini_index(head,flow,demand,wn)
+Leak: wn2=wntr.morph.split_pipe(wn,'P','Pa','leak'); wn2.get_node('leak').add_leak(wn2,area=0.05,start_time=0)
+Modify: add_junction/pipe/reservoir/pump/pattern | get_link('P').initial_status=wntr.network.LinkStatus.Closed
+Quality: wn.options.quality.parameter='CHEMICAL'; wn.add_source('S','R','CONCEN',1.0)
+Out:    wn.write_inpfile('out.inp') | wntr.graphics.plot_network(wn)
+`;
+
+// ─── State ────────────────────────────────────────────────────────────
+let apiKey  = localStorage.getItem('groq_api_key') || '';
+let inpText = '';
+let history = [];   // [{role:'user'|'assistant', content:'…'}]
+let loading = false;
+
+// ─── DOM ──────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const apiKeyInput = $('api-key-input');
+const saveKeyBtn  = $('save-key-btn');
+const dropZone    = $('drop-zone');
+const fileInput   = $('file-input');
+const fileInfo    = $('file-info');
+const removeFile  = $('remove-file');
+const statsSection= $('stats-section');
+const messages    = $('messages');
+const chatInput   = $('chat-input');
+const sendBtn     = $('send-btn');
+const clearBtn    = $('clear-btn');
+const statusDot   = $('status-dot');
+const statusLabel = $('status-label');
+const sidebar     = $('sidebar');
+const overlay     = $('overlay');
+
+// ─── Init ─────────────────────────────────────────────────────────────
+if (apiKey) apiKeyInput.value = apiKey;
+updateStatus();
+
+// ─── API key ──────────────────────────────────────────────────────────
+saveKeyBtn.addEventListener('click', () => {
+  const v = apiKeyInput.value.trim();
+  if (!v) return;
+  apiKey = v;
+  localStorage.setItem('groq_api_key', v);
+  updateStatus();
+  saveKeyBtn.textContent = 'Saved ✓';
+  setTimeout(() => { saveKeyBtn.textContent = 'Save'; }, 1500);
+});
+apiKeyInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveKeyBtn.click(); });
+
+function updateStatus() {
+  if (!apiKey) {
+    statusDot.className = 'error';
+    statusLabel.textContent = 'No API key';
+  } else if (!inpText) {
+    statusDot.className = '';
+    statusLabel.textContent = 'No file loaded';
+  } else {
+    statusDot.className = 'ready';
+    statusLabel.textContent = 'Ready';
+  }
+  chatInput.placeholder = apiKey
+    ? (inpText ? 'Ask about your EPANET network, EPyT, or WNTR…' : 'Upload a .inp file to start…')
+    : 'Add your Groq API key to start…';
+}
+
+// ─── File upload ──────────────────────────────────────────────────────
+dropZone.addEventListener('click',   () => fileInput.click());
+dropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+dropZone.addEventListener('dragover',e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave',  () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) processFile(fileInput.files[0]); });
+removeFile.addEventListener('click', () => {
+  inpText = ''; fileInput.value = '';
+  fileInfo.style.display = 'none';
+  dropZone.style.display = 'block';
+  statsSection.style.display = 'none';
+  history = [];
+  updateStatus();
+});
+
+function processFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    inpText = e.target.result;
+    $('file-name').textContent = file.name;
+    $('file-meta').textContent = `${(file.size / 1024).toFixed(1)} KB`;
+    fileInfo.style.display  = 'block';
+    dropZone.style.display  = 'none';
+    statsSection.style.display = 'block';
+    parseStats(inpText);
+    history = [];
+    updateStatus();
+    removeWelcome();
+    greet(file.name);
+    initViz();
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+// ─── INP parsing ──────────────────────────────────────────────────────
+function section(text, name) {
+  const m = text.match(new RegExp(`\\[${name}\\]([\\s\\S]*?)(?=\\n\\s*\\[|$)`, 'i'));
+  return m ? m[1] : '';
+}
+function countRows(s) {
+  return s.split('\n').filter(l => { const t = l.trim(); return t && !t.startsWith(';'); }).length;
+}
+function parseStats(text) {
+  $('val-junctions').textContent  = countRows(section(text, 'JUNCTIONS'));
+  $('val-pipes').textContent      = countRows(section(text, 'PIPES'));
+  $('val-reservoirs').textContent = countRows(section(text, 'RESERVOIRS'));
+  $('val-tanks').textContent      = countRows(section(text, 'TANKS'));
+  $('val-pumps').textContent      = countRows(section(text, 'PUMPS'));
+  $('val-valves').textContent     = countRows(section(text, 'VALVES'));
+}
+function networkContext(text) {
+  // Only include hydraulically relevant sections — skip geometry (COORDINATES/VERTICES/LABELS/BACKDROP/TAGS)
+  const ALLOWED  = ['JUNCTIONS','RESERVOIRS','TANKS','PIPES','PUMPS','VALVES',
+                    'STATUS','DEMANDS','PATTERNS','CURVES','CONTROLS','RULES',
+                    'OPTIONS','TIMES','REACTIONS','SOURCES','ENERGY','EMITTERS','QUALITY'];
+  const BIG      = ['JUNCTIONS','PIPES','DEMANDS','PATTERNS'];
+  const MAX_ROWS = 15;   // rows per big section
+  const MAX_CHARS = 2500; // hard cap on total context chars
+
+  const secs = [...text.matchAll(/^\s*\[(.*?)\]/gm)].map(m => m[1]);
+  const header = [
+    `=== NETWORK: ${$('val-junctions').textContent} junctions | ${$('val-pipes').textContent} pipes | ` +
+    `${$('val-reservoirs').textContent} reservoirs | ${$('val-tanks').textContent} tanks | ` +
+    `${$('val-pumps').textContent} pumps | ${$('val-valves').textContent} valves`,
+    `Sections present: ${secs.join(', ')}`, ''
+  ].join('\n');
+
+  let body = '';
+  for (const name of secs) {
+    if (!ALLOWED.includes(name.toUpperCase())) continue;
+    if (body.length >= MAX_CHARS) { body += '\n… [remaining sections omitted — ask me about specifics]'; break; }
+    const raw = section(text, name);
+    if (!raw.trim()) continue;
+    const rows = raw.split('\n').filter(l => { const t = l.trim(); return t && !t.startsWith(';'); });
+    const isBig = BIG.includes(name.toUpperCase());
+    const kept  = isBig && rows.length > MAX_ROWS ? rows.slice(0, MAX_ROWS) : rows;
+    body += `[${name}]\n${kept.join('\n')}`;
+    if (isBig && rows.length > MAX_ROWS) body += `\n… (${rows.length - MAX_ROWS} more — ask to see them)`;
+    body += '\n\n';
+  }
+
+  return header + body.slice(0, MAX_CHARS);
+}
+
+// ─── Chat helpers ─────────────────────────────────────────────────────
+function removeWelcome() { const w = $('welcome'); if (w) w.remove(); }
+
+function greet(fname) {
+  addMsg('ai',
+    `**${fname}** loaded — ` +
+    `${$('val-junctions').textContent} junctions · ${$('val-pipes').textContent} pipes · ` +
+    `${$('val-reservoirs').textContent} reservoirs · ${$('val-tanks').textContent} tanks · ` +
+    `${$('val-pumps').textContent} pumps\n\n` +
+    `Ask me anything about this network, or how to work with it in **EPyT** or **WNTR**.`
+  );
+}
+
+function addMsg(role, text) {
+  const wrap = document.createElement('div');
+  wrap.className = `msg ${role}`;
+  const av = document.createElement('div');
+  av.className = 'avatar';
+  av.textContent = role === 'user' ? 'You' : 'AI';
+  const bub = document.createElement('div');
+  bub.className = 'bubble';
+  bub.innerHTML = md(text);
+  wrap.appendChild(av); wrap.appendChild(bub);
+  messages.appendChild(wrap);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function showTyping() {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ai'; wrap.id = 'typing';
+  const av = document.createElement('div'); av.className = 'avatar'; av.textContent = 'AI';
+  const bub = document.createElement('div'); bub.className = 'bubble';
+  bub.innerHTML = '<div class="dots"><span></span><span></span><span></span></div>';
+  wrap.appendChild(av); wrap.appendChild(bub);
+  messages.appendChild(wrap);
+  messages.scrollTop = messages.scrollHeight;
+}
+function hideTyping() { const el = $('typing'); if (el) el.remove(); }
+
+// ─── Markdown renderer ────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function md(src) {
+  const blocks = [], inlines = [];
+  // code blocks
+  src = src.replace(/```[\w]*\n?([\s\S]*?)```/g, (_, c) => {
+    blocks.push(`<pre><code>${esc(c.trim())}</code></pre>`);
+    return `\x00B${blocks.length - 1}\x00`;
+  });
+  // inline code
+  src = src.replace(/`([^`]+)`/g, (_, c) => {
+    inlines.push(`<code>${esc(c)}</code>`);
+    return `\x00I${inlines.length - 1}\x00`;
+  });
+  src = esc(src);
+  src = src.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+  src = src.replace(/^### (.+)$/gm,  '<h3>$1</h3>');
+  src = src.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  src = src.replace(/\*(.+?)\*/g,     '<em>$1</em>');
+  src = src.replace(/^[-*] (.+)$/gm,  '<li>$1</li>');
+  src = src.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  src = src.replace(/(<li>[\s\S]*?<\/li>\n?)+/g, m => `<ul>${m}</ul>`);
+  src = src.split(/\n\n+/).map(p =>
+    /^<(h[34]|ul|pre|\x00B)/.test(p) ? p : `<p>${p.replace(/\n/g,'<br>')}</p>`
+  ).join('');
+  blocks.forEach((b, i)  => { src = src.replace(`\x00B${i}\x00`, b); });
+  inlines.forEach((b, i) => { src = src.replace(`\x00I${i}\x00`, b); });
+  return src;
+}
+
+// ─── Send message (Groq / Llama 3.3 70B) ─────────────────────────────
+async function send(text) {
+  text = text.trim();
+  if (!text || loading) return;
+  if (!apiKey) { addMsg('ai', '**No API key.** Enter your Groq key in the sidebar and click Save.'); return; }
+  if (!inpText){ addMsg('ai', '**No file.** Upload an EPANET `.inp` file first.'); return; }
+
+  removeWelcome();
+  addMsg('user', text);
+  chatInput.value = '';
+  resize();
+  loading = true; sendBtn.disabled = true;
+  showTyping();
+
+  const systemPrompt =
+    `You are an expert EPANET AI Assistant for water engineers and researchers.\n\n` +
+    `You have deep knowledge of EPANET 2.3, the EPyT Python Toolkit, and WNTR.\n\n` +
+    KNOWLEDGE + '\n\n' + networkContext(inpText) +
+    `\n\nRules:\n` +
+    `- Use the actual node/link IDs from the uploaded .inp when writing code examples.\n` +
+    `- Format answers with markdown: **bold**, \`code\`, \`\`\`python blocks\`\`\`, bullet lists.\n` +
+    `- Be precise and technical — the user is a water engineer.`;
+
+  const msgs = [
+    { role: 'system',    content: systemPrompt },
+    ...history,
+    { role: 'user',      content: text }
+  ];
+
+  try {
+    const res  = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: msgs, max_tokens: 1200, temperature: 0.4 })
+    });
+    const data = await res.json();
+
+    // Rate-limit: parse retry delay from Groq error and auto-retry once
+    if (res.status === 429) {
+      const errMsg = data?.error?.message || '';
+      const msMatch = errMsg.match(/try again in (\d+(?:\.\d+)?)ms/i);
+      const sMatch  = errMsg.match(/try again in (\d+(?:\.\d+)?)s/i);
+      const delay   = msMatch ? Math.ceil(parseFloat(msMatch[1])) + 200
+                    : sMatch  ? Math.ceil(parseFloat(sMatch[1]) * 1000) + 200
+                    : 3000;
+      hideTyping();
+      const retryMsg = addMsg('ai', `_Rate limit hit — retrying in ${(delay/1000).toFixed(1)}s…_`);
+      await new Promise(r => setTimeout(r, delay));
+      retryMsg.remove();
+      showTyping();
+      const res2  = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: msgs, max_tokens: 1200, temperature: 0.4 })
+      });
+      const data2 = await res2.json();
+      if (!res2.ok) throw new Error(data2?.error?.message || `HTTP ${res2.status}`);
+      const reply2 = data2.choices[0].message.content;
+      history.push({ role: 'user', content: text }); history.push({ role: 'assistant', content: reply2 });
+      if (history.length > 8) history = history.slice(-8);
+      hideTyping(); addMsg('ai', reply2);
+      return;
+    }
+
+    if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
+
+    const reply = data.choices[0].message.content;
+    history.push({ role: 'user',      content: text  });
+    history.push({ role: 'assistant', content: reply });
+    if (history.length > 8) history = history.slice(-8);  // keep last 4 exchanges
+
+    hideTyping(); addMsg('ai', reply);
+  } catch (err) {
+    hideTyping();
+    addMsg('ai', `**Error:** ${esc(err.message)}\n\nCheck your Groq key at [console.groq.com](https://console.groq.com).`);
+  } finally {
+    loading = false; sendBtn.disabled = false; chatInput.focus();
+  }
+}
+
+// ─── Input bar ────────────────────────────────────────────────────────
+sendBtn.addEventListener('click', () => send(chatInput.value));
+chatInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(chatInput.value); }
+});
+chatInput.addEventListener('input', resize);
+function resize() {
+  chatInput.style.height = 'auto';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 140) + 'px';
+}
+
+clearBtn.addEventListener('click', () => {
+  history = []; messages.innerHTML = '';
+  if (inpText) greet($('file-name').textContent);
+});
+
+// ─── Suggested questions ──────────────────────────────────────────────
+$('suggestions').addEventListener('click', e => {
+  const btn = e.target.closest('.sug-btn');
+  if (!btn) return;
+  chatInput.value = btn.textContent.trim();
+  resize(); chatInput.focus();
+  send(btn.textContent.trim());
+  sidebar.classList.remove('open'); overlay.classList.remove('show');
+});
+
+// ─── Mobile sidebar ───────────────────────────────────────────────────
+$('menu-btn').addEventListener('click', () => {
+  sidebar.classList.toggle('open'); overlay.classList.toggle('show');
+});
+overlay.addEventListener('click', () => {
+  sidebar.classList.remove('open'); overlay.classList.remove('show');
+});
+
+// ═══════════════════════════════════════════════════════════════
+// ── VISUALIZATION PANEL ────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+let vizOpen = false;
+let svgScale = 1, svgTx = 0, svgTy = 0;
+let netNodes = [], netLinks = [];
+let simPressures = {};
+let chartInst = null;
+let currentCTab = 'pattern';
+
+// ── Toggle panel ────────────────────────────────────────────────
+function toggleViz() {
+  vizOpen = !vizOpen;
+  const panel = document.getElementById('viz-panel');
+  const btn   = document.getElementById('viz-toggle-btn');
+  panel.classList.toggle('hidden', !vizOpen);
+  btn.classList.toggle('on', vizOpen);
+  if (vizOpen && inpText) drawNetwork(document.getElementById('color-mode').value);
+}
+
+// ── Tab switching ────────────────────────────────────────────────
+function switchVizTab(id, el) {
+  document.querySelectorAll('.viz-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.viz-pane').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('vp-' + id).classList.add('active');
+  if (id === 'charts') updateChart(currentCTab);
+}
+function switchCTab(id, el) {
+  document.querySelectorAll('.ctab').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  currentCTab = id;
+  updateChart(id);
+}
+
+// ── Init viz on file load ────────────────────────────────────────
+function initViz() {
+  netNodes = []; netLinks = []; simPressures = {};
+  parseNetworkGeometry();
+  const simBtn = document.getElementById('sim-btn');
+  if (simBtn) { simBtn.disabled = false; simBtn.textContent = 'Run Hydraulic Simulation'; }
+  document.getElementById('sim-grid').style.display = 'none';
+  document.getElementById('sim-status').textContent = '';
+  if (vizOpen) drawNetwork(document.getElementById('color-mode').value);
+  document.getElementById('map-info').textContent =
+    `${netNodes.filter(n=>n.type==='junction').length} junctions · ${netLinks.length} links`;
+}
+
+// ── Parse [JUNCTIONS], [RESERVOIRS], [TANKS], [PIPES] ──────────
+function parseNetworkGeometry() {
+  if (!inpText) return;
+  const jSec = section(inpText, 'JUNCTIONS');
+  const rSec = section(inpText, 'RESERVOIRS');
+  const tSec = section(inpText, 'TANKS');
+  const pSec = section(inpText, 'PIPES');
+  const cSec = section(inpText, 'COORDINATES');
+  const coords = {};
+  if (cSec) {
+    cSec.trim().split('\n').forEach(ln => {
+      const p = ln.trim().split(/\s+/);
+      if (p.length >= 3 && !ln.startsWith(';')) coords[p[0]] = { x: parseFloat(p[1]), y: parseFloat(p[2]) };
+    });
+  }
+  netNodes = [];
+  const parseNodes = (sec, type) => {
+    if (!sec) return;
+    sec.trim().split('\n').forEach(ln => {
+      if (ln.trim() === '' || ln.trim().startsWith(';')) return;
+      const p = ln.trim().split(/\s+/);
+      const id = p[0];
+      const elev = parseFloat(p[1]) || 0;
+      const demand = parseFloat(p[2]) || 0;
+      if (coords[id]) netNodes.push({ id, type, elev, demand, x: coords[id].x, y: coords[id].y });
+    });
+  };
+  parseNodes(jSec, 'junction');
+  parseNodes(rSec, 'reservoir');
+  parseNodes(tSec, 'tank');
+  netLinks = [];
+  if (pSec) {
+    pSec.trim().split('\n').forEach(ln => {
+      if (ln.trim() === '' || ln.trim().startsWith(';')) return;
+      const p = ln.trim().split(/\s+/);
+      if (p.length < 4) return;
+      const id = p[0], from = p[1], to = p[2], diam = parseFloat(p[4]) || 0;
+      netLinks.push({ id, from, to, diam });
+    });
+  }
+}
+
+// ── SVG drawing ─────────────────────────────────────────────────
+function drawNetwork(colorMode) {
+  const g = document.getElementById('svg-group');
+  if (!g) return;
+  if (netNodes.length === 0) {
+    g.innerHTML = '';
+    document.getElementById('color-legend').style.display = 'none';
+    document.getElementById('map-info').textContent = 'No coordinate data in network';
+    return;
+  }
+  const wrap = document.getElementById('net-wrap');
+  const W = wrap.clientWidth || 420, H = wrap.clientHeight || 360;
+
+  const xs = netNodes.map(n => n.x), ys = netNodes.map(n => n.y);
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  const yMin = Math.min(...ys), yMax = Math.max(...ys);
+  const PAD = 30;
+  const scaleX = (W - PAD*2) / (xMax - xMin || 1);
+  const scaleY = (H - PAD*2) / (yMax - yMin || 1);
+  const sc = Math.min(scaleX, scaleY);
+  const cx = (W - (xMax - xMin) * sc) / 2;
+  const cy = (H - (yMax - yMin) * sc) / 2;
+  const tx = n => cx + (n.x - xMin) * sc;
+  const ty = n => H - cy - (n.y - yMin) * sc;
+
+  const coordMap = {};
+  netNodes.forEach(n => { coordMap[n.id] = { px: tx(n), py: ty(n) }; });
+
+  // Color scale
+  let vals = [], lo = 0, hi = 1, legend = false;
+  if (colorMode === 'elev') {
+    vals = netNodes.filter(n=>n.type==='junction').map(n=>n.elev);
+    lo = Math.min(...vals); hi = Math.max(...vals);
+    legend = true;
+    document.getElementById('legend-title').textContent = 'Elevation';
+    document.getElementById('leg-lo').textContent = lo.toFixed(0);
+    document.getElementById('leg-hi').textContent = hi.toFixed(0);
+  } else if (colorMode === 'demand') {
+    vals = netNodes.filter(n=>n.type==='junction').map(n=>n.demand);
+    lo = Math.min(...vals); hi = Math.max(...vals) || 1;
+    legend = true;
+    document.getElementById('legend-title').textContent = 'Base Demand';
+    document.getElementById('leg-lo').textContent = lo.toFixed(2);
+    document.getElementById('leg-hi').textContent = hi.toFixed(2);
+  } else if (colorMode === 'pressure' && Object.keys(simPressures).length > 0) {
+    const pvs = Object.values(simPressures);
+    lo = Math.min(...pvs); hi = Math.max(...pvs) || 1;
+    legend = true;
+    document.getElementById('legend-title').textContent = 'Pressure (m)';
+    document.getElementById('leg-lo').textContent = lo.toFixed(1);
+    document.getElementById('leg-hi').textContent = hi.toFixed(1);
+  }
+  document.getElementById('color-legend').style.display = legend ? 'block' : 'none';
+
+  const getColor = (n) => {
+    if (colorMode === 'type') {
+      return n.type === 'reservoir' ? '#0369a1' : n.type === 'tank' ? '#7c3aed' : '#0ea5e9';
+    }
+    let t = 0;
+    if (colorMode === 'elev') t = hi > lo ? (n.elev - lo)/(hi - lo) : 0.5;
+    else if (colorMode === 'demand') t = hi > lo ? (n.demand - lo)/(hi - lo) : 0.5;
+    else if (colorMode === 'pressure') {
+      const p = simPressures[n.id];
+      t = p !== undefined && hi > lo ? (p - lo)/(hi - lo) : 0.5;
+    }
+    return gradColor(t);
+  };
+
+  let html = '';
+  // Links
+  netLinks.forEach(lk => {
+    const a = coordMap[lk.from], b = coordMap[lk.to];
+    if (!a || !b) return;
+    const w = Math.max(0.8, Math.min(3, (lk.diam || 100) / 100));
+    html += `<line x1="${a.px.toFixed(1)}" y1="${a.py.toFixed(1)}" x2="${b.px.toFixed(1)}" y2="${b.py.toFixed(1)}"
+      stroke="#94a3b8" stroke-width="${w}" stroke-opacity="0.7"
+      data-id="${lk.id}" data-from="${lk.from}" data-to="${lk.to}" data-diam="${lk.diam}"
+      class="net-link"/>`;
+  });
+  // Nodes
+  netNodes.forEach(n => {
+    const px = tx(n).toFixed(1), py = ty(n).toFixed(1);
+    const col = getColor(n);
+    if (n.type === 'reservoir') {
+      html += `<polygon points="${px},${(+py-7).toFixed(1)} ${(+px+6).toFixed(1)},${(+py+5).toFixed(1)} ${(+px-6).toFixed(1)},${(+py+5).toFixed(1)}"
+        fill="${col}" stroke="white" stroke-width="1"
+        class="net-node" data-id="${n.id}" data-type="${n.type}" data-elev="${n.elev}" data-demand="${n.demand}"/>`;
+    } else if (n.type === 'tank') {
+      html += `<rect x="${(+px-5).toFixed(1)}" y="${(+py-5).toFixed(1)}" width="10" height="10"
+        fill="${col}" stroke="white" stroke-width="1"
+        class="net-node" data-id="${n.id}" data-type="${n.type}" data-elev="${n.elev}" data-demand="${n.demand}"/>`;
+    } else {
+      html += `<circle cx="${px}" cy="${py}" r="4"
+        fill="${col}" stroke="white" stroke-width="1"
+        class="net-node" data-id="${n.id}" data-type="${n.type}" data-elev="${n.elev}" data-demand="${n.demand}"/>`;
+    }
+  });
+  g.innerHTML = html;
+  svgScale = 1; svgTx = 0; svgTy = 0;
+  g.setAttribute('transform', 'translate(0,0) scale(1)');
+  setupSvgInteraction();
+}
+
+function gradColor(t) {
+  const r1=[22,154,74], r2=[250,204,21], r3=[220,38,38];
+  const a = t < 0.5 ? r1 : r2, b = t < 0.5 ? r2 : r3;
+  const u = t < 0.5 ? t*2 : (t-0.5)*2;
+  const lerp = (a,b,u) => Math.round(a+(b-a)*u);
+  return `rgb(${lerp(a[0],b[0],u)},${lerp(a[1],b[1],u)},${lerp(a[2],b[2],u)})`;
+}
+
+// ── SVG zoom / pan ───────────────────────────────────────────────
+function applyTransform() {
+  const g = document.getElementById('svg-group');
+  if (g) g.setAttribute('transform', `translate(${svgTx},${svgTy}) scale(${svgScale})`);
+}
+function svgZoom(factor) {
+  const wrap = document.getElementById('net-wrap');
+  const W = wrap.clientWidth/2, H = wrap.clientHeight/2;
+  svgTx = W + (svgTx - W) * factor;
+  svgTy = H + (svgTy - H) * factor;
+  svgScale *= factor;
+  applyTransform();
+}
+function svgReset() { svgScale=1; svgTx=0; svgTy=0; applyTransform(); }
+
+function setupSvgInteraction() {
+  const svg = document.getElementById('net-svg');
+  const tip = document.getElementById('net-tooltip');
+  if (!svg) return;
+  let drag = false, lastX = 0, lastY = 0;
+  svg.onmousedown = e => { drag = true; lastX = e.clientX; lastY = e.clientY; };
+  svg.onmousemove = e => {
+    if (drag) {
+      svgTx += e.clientX - lastX; svgTy += e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY; applyTransform();
+    }
+    // Tooltip on node hover
+    const el = e.target;
+    if (el.classList.contains('net-node') || el.classList.contains('net-link')) {
+      const d = el.dataset;
+      let html = `<b>${d.id}</b><br>`;
+      if (d.type) html += `Type: ${d.type}<br>Elev: ${(+d.elev).toFixed(2)} m<br>Demand: ${(+d.demand).toFixed(4)}`;
+      if (d.from) html += `From: ${d.from}<br>To: ${d.to}<br>Diam: ${d.diam} mm`;
+      if (simPressures[d.id] !== undefined) html += `<br>Pressure: ${simPressures[d.id].toFixed(2)} m`;
+      const rect = svg.getBoundingClientRect();
+      tip.style.left = (e.clientX - rect.left + 10) + 'px';
+      tip.style.top  = (e.clientY - rect.top - 10) + 'px';
+      tip.innerHTML = html; tip.style.display = 'block';
+    } else { tip.style.display = 'none'; }
+  };
+  svg.onmouseup = () => { drag = false; };
+  svg.onmouseleave = () => { drag = false; tip.style.display = 'none'; };
+  svg.onwheel = e => { e.preventDefault(); svgZoom(e.deltaY < 0 ? 1.15 : 0.87); };
+}
+
+// ── Chart.js charts ──────────────────────────────────────────────
+function updateChart(ctab) {
+  const canvas = document.getElementById('main-chart');
+  const noMsg  = document.getElementById('no-patterns');
+  if (!canvas) return;
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  canvas.style.display = 'block';
+  noMsg.style.display  = 'none';
+
+  if (ctab === 'pattern') {
+    const pSec = section(inpText || '', 'PATTERNS');
+    if (!pSec || !pSec.trim()) {
+      canvas.style.display = 'none'; noMsg.style.display = 'block'; return;
+    }
+    // Aggregate rows per pattern ID
+    const patterns = {};
+    pSec.trim().split('\n').forEach(ln => {
+      if (!ln.trim() || ln.trim().startsWith(';')) return;
+      const p = ln.trim().split(/\s+/);
+      const id = p[0];
+      if (!patterns[id]) patterns[id] = [];
+      for (let i = 1; i < p.length; i++) patterns[id].push(parseFloat(p[i]));
+    });
+    const ids = Object.keys(patterns).slice(0, 5);
+    const colors = ['#0ea5e9','#f59e0b','#10b981','#8b5cf6','#ef4444'];
+    const maxLen = Math.max(...ids.map(id => patterns[id].length));
+    const labels = Array.from({length: maxLen}, (_,i) => `T${i+1}`);
+    chartInst = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: ids.map((id, i) => ({
+          label: id, data: patterns[id], borderColor: colors[i%5],
+          borderWidth: 2, pointRadius: 2, tension: 0.3, fill: false
+        }))
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        plugins: { legend: { labels: { font: { size: 10 } } } },
+        scales: { y: { title: { display: true, text: 'Multiplier', font:{size:10} }, ticks:{font:{size:9}} },
+                  x: { ticks:{font:{size:9}}, title:{display:true, text:'Time step',font:{size:10}} } }
+      }
+    });
+  } else if (ctab === 'elev') {
+    const elevs = netNodes.filter(n=>n.type==='junction').map(n=>n.elev);
+    if (!elevs.length) { canvas.style.display='none'; noMsg.textContent='No junction data'; noMsg.style.display='block'; return; }
+    const min = Math.floor(Math.min(...elevs)), max = Math.ceil(Math.max(...elevs));
+    const bins = 12, step = (max-min)/bins || 1;
+    const counts = new Array(bins).fill(0);
+    elevs.forEach(e => { const i = Math.min(bins-1, Math.floor((e-min)/step)); counts[i]++; });
+    const labels = counts.map((_,i) => `${(min+i*step).toFixed(0)}–${(min+(i+1)*step).toFixed(0)}`);
+    chartInst = new Chart(canvas, {
+      type: 'bar',
+      data: { labels, datasets: [{ label:'Junctions', data: counts, backgroundColor:'#0ea5e9', borderRadius:3 }] },
+      options: { responsive:true, maintainAspectRatio:true,
+        plugins:{legend:{display:false}},
+        scales:{ x:{ticks:{font:{size:8},maxRotation:45}}, y:{title:{display:true,text:'Count',font:{size:10}},ticks:{font:{size:9}}} }
+      }
+    });
+  } else if (ctab === 'diam') {
+    const pSec = section(inpText || '', 'PIPES');
+    const diams = [];
+    if (pSec) {
+      pSec.trim().split('\n').forEach(ln => {
+        if (!ln.trim() || ln.trim().startsWith(';')) return;
+        const p = ln.trim().split(/\s+/);
+        if (p.length >= 5) { const d = parseFloat(p[4]); if (!isNaN(d)) diams.push(d); }
+      });
+    }
+    if (!diams.length) { canvas.style.display='none'; noMsg.textContent='No pipe data'; noMsg.style.display='block'; return; }
+    const min = Math.floor(Math.min(...diams)), max = Math.ceil(Math.max(...diams));
+    const bins = 10, step = (max-min)/bins || 1;
+    const counts = new Array(bins).fill(0);
+    diams.forEach(d => { const i = Math.min(bins-1, Math.floor((d-min)/step)); counts[i]++; });
+    const labels = counts.map((_,i) => `${(min+i*step).toFixed(0)}`);
+    chartInst = new Chart(canvas, {
+      type: 'bar',
+      data: { labels, datasets: [{ label:'Pipes', data:counts, backgroundColor:'#10b981', borderRadius:3 }] },
+      options: { responsive:true, maintainAspectRatio:true,
+        plugins:{legend:{display:false}},
+        scales:{ x:{title:{display:true,text:'Diameter (mm)',font:{size:10}},ticks:{font:{size:9}}},
+                 y:{title:{display:true,text:'Count',font:{size:10}},ticks:{font:{size:9}}} }
+      }
+    });
+  }
+}
+
+// ── epanet-js WebAssembly simulation ────────────────────────────
+async function runSim() {
+  const btn = document.getElementById('sim-btn');
+  const statusEl = document.getElementById('sim-status');
+  if (!inpText) { statusEl.textContent = 'Please load a .inp file first.'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Running…';
+  statusEl.textContent = 'Loading EPANET WebAssembly engine…';
+  document.getElementById('sim-grid').style.display = 'none';
+
+  try {
+    if (!window.epanetjs) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/epanet-js@0.7.0/dist/epanet-js.min.js';
+        s.onload = resolve; s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+    statusEl.textContent = 'Initialising project…';
+    const { Project, Workspace } = window.epanetjs;
+    const ws = new Workspace();
+    ws.writeFile('net.inp', inpText);
+    const proj = new Project(ws);
+    proj.open('net.inp', 'net.rpt', 'net.bin');
+    statusEl.textContent = 'Solving hydraulics…';
+    proj.solveH();
+    // Read pressures
+    simPressures = {};
+    const nodeCount = proj.getCount(0);   // EN_NODECOUNT
+    for (let i = 1; i <= nodeCount; i++) {
+      const id = proj.getNodeId(i);
+      const pressure = proj.getNodeValue(i, 11); // EN_PRESSURE
+      simPressures[id] = pressure;
+    }
+    const pvs = Object.values(simPressures);
+    document.getElementById('sv-nodes').textContent = nodeCount;
+    document.getElementById('sv-pipes').textContent = proj.getCount(2); // EN_LINKCOUNT
+    document.getElementById('sv-pmin').textContent  = Math.min(...pvs).toFixed(1);
+    document.getElementById('sv-pmax').textContent  = Math.max(...pvs).toFixed(1);
+    document.getElementById('sim-grid').style.display = 'grid';
+    statusEl.textContent = '✓ Simulation complete. Switch to Map and select "Pressure (sim)" to see results.';
+    proj.close();
+    // Update color mode to pressure
+    const sel = document.getElementById('color-mode');
+    sel.value = 'pressure';
+    drawNetwork('pressure');
+  } catch(err) {
+    statusEl.textContent = '⚠ ' + (err.message || 'Simulation failed. Some networks may need minor INP fixes.');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Run Hydraulic Simulation';
+}
+</script>
+</body>
+</html>
