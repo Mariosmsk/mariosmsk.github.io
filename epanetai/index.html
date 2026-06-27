@@ -161,6 +161,15 @@
     }
     .stat-card .val { font-size: 1.3rem; font-weight: 700; color: var(--accent); }
     .stat-card .lbl { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+    .provider-btn {
+      flex: 1; padding: 5px 8px; border-radius: 7px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--muted); font-size: 0.74rem; font-weight: 600;
+      cursor: pointer; transition: all 0.15s; text-align: center;
+    }
+    .provider-btn.active { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+    .provider-btn:hover:not(.active) { background: var(--border); color: var(--text); }
+
     /* ── KNOWLEDGE BADGES ───────────────────── */
     .doc-badges { display: flex; flex-direction: column; gap: 5px; }
     .doc-badge {
@@ -490,7 +499,7 @@
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="10" rx="1"/><rect x="14" y="17" width="7" height="4" rx="1"/></svg>
       Visualize
     </button>
-    <span class="model-badge">Groq · Compound Beta</span>
+    <span class="model-badge">Llama 3.3 · 70B</span>
     <div id="status-dot"></div>
     <span id="status-label">Not configured</span>
   </div>
@@ -502,18 +511,29 @@
 
   <aside id="sidebar">
 
-    <!-- API Key -->
+    <!-- Provider + API Key -->
     <div class="s-section">
-      <h2>Groq API Key</h2>
-      <div class="row">
-        <input type="password" id="api-key-input" placeholder="gsk_…" autocomplete="off" />
-        <button class="btn" id="save-key-btn">Save</button>
+      <h2>AI Provider</h2>
+      <div class="row" style="margin-bottom:8px">
+        <button class="provider-btn active" id="btn-groq" onclick="switchProvider('groq')">Groq <span style="font-size:0.68rem;opacity:0.75">(primary)</span></button>
+        <button class="provider-btn" id="btn-hf" onclick="switchProvider('hf')">HuggingFace <span style="font-size:0.68rem;opacity:0.75">(secondary)</span></button>
       </div>
-      <p class="hint">
-        Free key (no credit card) at
-        <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a>.
-        Stored only in your browser.
-      </p>
+
+      <div id="groq-key-wrap">
+        <div class="row">
+          <input type="password" id="api-key-input" placeholder="gsk_…" autocomplete="off" />
+          <button class="btn" id="save-key-btn">Save</button>
+        </div>
+        <p class="hint">Free at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a> · <strong>Llama 3.3 70B</strong></p>
+      </div>
+
+      <div id="hf-key-wrap" style="display:none">
+        <div class="row">
+          <input type="password" id="hf-key-input" placeholder="hf_…" autocomplete="off" />
+          <button class="btn" id="save-hf-btn">Save</button>
+        </div>
+        <p class="hint">Free at <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">huggingface.co/settings/tokens</a> · <strong>Qwen 2.5 72B</strong></p>
+      </div>
     </div>
 
     <!-- File Upload -->
@@ -604,7 +624,7 @@
              style="color:var(--accent); text-decoration:none">WNTR</a>
         </div>
         <div style="margin-top:6px; color:var(--muted)">
-          Powered by Groq · Compound Beta
+          Powered by Llama 3.3 · 70B
         </div>
       </div>
     </div>
@@ -737,29 +757,17 @@ Headloss: H-W=10.67×L×Q^1.852/(C^1.852×D^4.87) | D-W=f×L/D×V²/2g
 Units: US=GPM/ft/psi/in | SI=LPS/m/m/mm | CMS added in 2.3 | Quality: CHEMICAL=mg/L decay(K_b<0), TRACE=% from source, AGE=hours
 New in 2.3: PCV valve(pressure control curve) | PDA pressure-driven analysis(EN_DDA=0,EN_PDA=1) | Leakage modeling(leak area+expansion) | Emitter backflow option | Pressure units(EN_PSI=0,EN_KPA=1,EN_METERS=2) | Bulk API: ENgetnodevalues/ENgetlinkvalues | Control/rule enable flags: ENgetcontrolenabled/ENgetruleenabled | ENtimetonextevent(HYD/WQ/TANK/CONTROL events) | ENloadpatternfile | ENopenX(lenient parsing) | Stats: deficient nodes, demand reduction, total leakage loss
 
-=== EPyT (pip install epyt) — supports EPANET 2.3 ===
+=== EPyT (pip install epyt) — EPANET 2.3 ===
 from epyt import epanet; d=epanet('net.inp')
-Counts: getNodeCount/JunctionCount/ReservoirCount/TankCount/LinkCount/PipeCount/PumpCount/ValveCount
-Node:   getNodeNameID/Elevations/BaseDemands/Coordinates/Type/TankInitialLevel/TankDiameter
-Link:   getLinkNameID/Length/Diameter/RoughnessCoeff/InitialStatus/NodesIndex/PumpHeadCurveIndex/ValveType
-Pat/Crv: getPatternNameID/Lengths | getCurveNameID/Value/Type(1=PUMP,2=EFFICIENCY,3=VOLUME,4=HEADLOSS,5=VALVE)
-Run:    d.solveCompleteHydraulics(); d.solveCompleteQuality()
-R=d.getComputedHydraulicTimeSeries() → R.Pressure/Head/Demand/Flow/Velocity/HeadLoss/Time [ndarray timesteps×items]
-RQ=d.getComputedQualityTimeSeries() → RQ.NodeQuality/LinkQuality
-Step loop: openHydraulicAnalysis(); initializeHydraulicAnalysis()
-  while tstep>0: t=runHydraulicAnalysis(); P=getNodePressure(); tstep=nextHydraulicAnalysisStep(); closeHydraulicAnalysis()
-Set:    setNodeElevations/BaseDemands | setLinkDiameter/Length/RoughnessCoeff/InitialStatus(1=open,0=closed) | setPattern(idx,vals)
-Add:    addNodeJunction('J',[x,y],elev,dem) | addLinkPipe('P','N1','N2',len,diam,rough) | addNodeReservoir | addLinkPump
-PCV:    addLinkValvePCV('V','N1','N2') | setLinkValveCurvePCV(idx,curve_idx) | getLinkValveCurvePCV(idx)
-GPV:    getLinkValveCurveGPV(idx) | setLinkValveCurveGPV(idx,curve_idx)
-Leakage(2.3): getLinkLeakArea(idx)/setLinkLeakArea(idx,area) | getLinkLeakageRate(idx) | getNodeLeakageFlow(idx) | getNodeEmitterFlow(idx)
-Demand(2.3): getConsumerDemandRequested/Delivered | getStatisticDeficientNodes | getStatisticDemandReduction | getStatisticTotalLeakageLoss
-Control(2.3): getControlState(idx) | getRuleEnabled(idx) | setRuleEnabled(idx,flag) | getLinkInControl | getNodeInControl
-Options(2.3): getOptionsPressureUnits/setOptionsPressureUnits(EN_PSI=0/EN_KPA=1/EN_METERS=2) | getOptionsStatusReport/setOptionsStatusReport
-Patterns(2.3): loadPatternFile('pat.txt',id) | getPatternAverageDefaultValue
-Curves(2.3): setCurveType/setCurveTypeVolume/Pump/Efficiency/Headloss/General/ValveCurve
-Time(2.3): getTimetoNextEvent → (event_type, time_to_event); types: HYD=1,WQ=2,TANK=3,CONTROL=4
-Out:    saveInputFile('out.inp') | plot()/plotPressure()/plotFlow() | openX('net.inp') | unload()
+Get:    getNodeCount/JunctionCount/ReservoirCount/TankCount/LinkCount/PipeCount/PumpCount/ValveCount
+        getNodeNameID/Elevations/BaseDemands/Coordinates/Type | getLinkNameID/Length/Diameter/RoughnessCoeff/InitialStatus
+Run:    solveCompleteHydraulics/Quality() | R=getComputedHydraulicTimeSeries()→R.Pressure/Head/Demand/Flow/Velocity
+Set:    setNodeElevations/BaseDemands | setLinkDiameter/Length/RoughnessCoeff/InitialStatus | setPattern(idx,vals)
+Add:    addNodeJunction/Reservoir/Tank | addLinkPipe/Pump | addLinkValvePCV('V','N1','N2')
+2.3:    getLinkLeakArea/setLinkLeakArea | getLinkLeakageRate | getNodeLeakageFlow | getConsumerDemandRequested/Delivered
+        getControlState | getRuleEnabled/setRuleEnabled | setOptionsPressureUnits(0=PSI,1=KPA,2=m)
+        setCurveType(VOLUME/PUMP/EFFICIENCY/HEADLOSS/GENERAL/VALVE) | getTimetoNextEvent | loadPatternFile | openX
+Out:    saveInputFile('out.inp') | plot()/plotPressure()/plotFlow() | unload()
 
 === WNTR (pip install wntr) ===
 import wntr; wn=wntr.network.WaterNetworkModel('net.inp')
@@ -777,6 +785,8 @@ Out:    wn.write_inpfile('out.inp') | wntr.graphics.plot_network(wn)
 
 // ─── State ────────────────────────────────────────────────────────────
 let apiKey  = localStorage.getItem('groq_api_key') || '';
+let hfKey   = localStorage.getItem('hf_api_key')   || '';
+let provider = localStorage.getItem('ai_provider') || 'groq';
 let inpText = '';
 let history = [];   // [{role:'user'|'assistant', content:'…'}]
 let loading = false;
@@ -785,6 +795,8 @@ let loading = false;
 const $ = id => document.getElementById(id);
 const apiKeyInput = $('api-key-input');
 const saveKeyBtn  = $('save-key-btn');
+const hfKeyInput  = $('hf-key-input');
+const saveHfBtn   = $('save-hf-btn');
 const dropZone    = $('drop-zone');
 const fileInput   = $('file-input');
 const fileInfo    = $('file-info');
@@ -801,9 +813,24 @@ const overlay     = $('overlay');
 
 // ─── Init ─────────────────────────────────────────────────────────────
 if (apiKey) apiKeyInput.value = apiKey;
+if (hfKey)  hfKeyInput.value  = hfKey;
+switchProvider(provider, true);
 updateStatus();
 
-// ─── API key ──────────────────────────────────────────────────────────
+// ─── Provider switch ──────────────────────────────────────────────────
+function switchProvider(p, silent) {
+  provider = p;
+  localStorage.setItem('ai_provider', p);
+  $('btn-groq').classList.toggle('active', p === 'groq');
+  $('btn-hf').classList.toggle('active',   p === 'hf');
+  $('groq-key-wrap').style.display = p === 'groq' ? '' : 'none';
+  $('hf-key-wrap').style.display   = p === 'hf'   ? '' : 'none';
+  const badge = document.querySelector('.model-badge');
+  if (badge) badge.textContent = p === 'hf' ? 'HF · Qwen 2.5 72B' : 'Llama 3.3 · 70B';
+  if (!silent) updateStatus();
+}
+
+// ─── Groq API key ─────────────────────────────────────────────────────
 saveKeyBtn.addEventListener('click', () => {
   const v = apiKeyInput.value.trim();
   if (!v) return;
@@ -815,8 +842,22 @@ saveKeyBtn.addEventListener('click', () => {
 });
 apiKeyInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveKeyBtn.click(); });
 
+// ─── HuggingFace API key ───────────────────────────────────────────────
+saveHfBtn.addEventListener('click', () => {
+  const v = hfKeyInput.value.trim();
+  if (!v) return;
+  hfKey = v;
+  localStorage.setItem('hf_api_key', v);
+  updateStatus();
+  saveHfBtn.textContent = 'Saved ✓';
+  setTimeout(() => { saveHfBtn.textContent = 'Save'; }, 1500);
+});
+hfKeyInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveHfBtn.click(); });
+
 function updateStatus() {
-  if (!apiKey) {
+  const key = provider === 'hf' ? hfKey : apiKey;
+  const providerName = provider === 'hf' ? 'HuggingFace' : 'Groq';
+  if (!key) {
     statusDot.className = 'error';
     statusLabel.textContent = 'No API key';
   } else if (!inpText) {
@@ -826,9 +867,9 @@ function updateStatus() {
     statusDot.className = 'ready';
     statusLabel.textContent = 'Ready';
   }
-  chatInput.placeholder = apiKey
+  chatInput.placeholder = key
     ? (inpText ? 'Ask about your EPANET network, EPyT, or WNTR…' : 'Upload a .inp file to start…')
-    : 'Add your Groq API key to start…';
+    : `Add your ${providerName} API key to start…`;
 }
 
 // ─── File upload ──────────────────────────────────────────────────────
@@ -1019,15 +1060,37 @@ async function send(text) {
     { role: 'user',      content: text }
   ];
 
+  // ── Provider config ────────────────────────────────────────────
+  const isHF = provider === 'hf';
+  const activeKey = isHF ? hfKey : apiKey;
+  const endpoint  = isHF
+    ? 'https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct/v1/chat/completions'
+    : 'https://api.groq.com/openai/v1/chat/completions';
+  const model     = isHF
+    ? 'Qwen/Qwen2.5-72B-Instruct'
+    : 'llama-3.3-70b-versatile';
+  const keyLink   = isHF
+    ? '[huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)'
+    : '[console.groq.com](https://console.groq.com)';
+
+  if (!activeKey) {
+    hideTyping();
+    addMsg('ai', `**No API key set.** Add your ${isHF ? 'HuggingFace' : 'Groq'} key in the sidebar.`);
+    loading = false; sendBtn.disabled = false; chatInput.focus();
+    return;
+  }
+
+  const callAPI = () => fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeKey}` },
+    body: JSON.stringify({ model, messages: msgs, max_tokens: 1200, temperature: 0.4 })
+  });
+
   try {
-    const res  = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: 'compound-beta', messages: msgs, max_tokens: 1200, temperature: 0.4 })
-    });
+    const res  = await callAPI();
     const data = await res.json();
 
-    // Rate-limit: parse retry delay from Groq error and auto-retry once
+    // Rate-limit: parse retry delay and auto-retry once (Groq only sends retry hints)
     if (res.status === 429) {
       const errMsg = data?.error?.message || '';
       const msMatch = errMsg.match(/try again in (\d+(?:\.\d+)?)ms/i);
@@ -1040,11 +1103,7 @@ async function send(text) {
       await new Promise(r => setTimeout(r, delay));
       retryMsg.remove();
       showTyping();
-      const res2  = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: 'compound-beta', messages: msgs, max_tokens: 1200, temperature: 0.4 })
-      });
+      const res2  = await callAPI();
       const data2 = await res2.json();
       if (!res2.ok) throw new Error(data2?.error?.message || `HTTP ${res2.status}`);
       const reply2 = data2.choices[0].message.content;
@@ -1059,12 +1118,12 @@ async function send(text) {
     const reply = data.choices[0].message.content;
     history.push({ role: 'user',      content: text  });
     history.push({ role: 'assistant', content: reply });
-    if (history.length > 8) history = history.slice(-8);  // keep last 4 exchanges
+    if (history.length > 8) history = history.slice(-8);
 
     hideTyping(); addMsg('ai', reply);
   } catch (err) {
     hideTyping();
-    addMsg('ai', `**Error:** ${esc(err.message)}\n\nCheck your Groq key at [console.groq.com](https://console.groq.com).`);
+    addMsg('ai', `**Error:** ${esc(err.message)}\n\nCheck your key at ${keyLink}.`);
   } finally {
     loading = false; sendBtn.disabled = false; chatInput.focus();
   }
